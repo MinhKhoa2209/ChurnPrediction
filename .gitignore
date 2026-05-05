@@ -98,6 +98,8 @@ tests/
 /tests/
 /test/
 /__tests__/
+test*.html
+*test*.html
 
 # Database
 *.db
