@@ -151,9 +151,6 @@ The platform follows **Clean Architecture** principles with clear separation of 
 
 ## 🚀 Getting Started
 
-### Prerequisites
-
-
 ### Quick Start
 
 #### 1. Clone the Repository
@@ -307,66 +304,6 @@ The platform supports three user roles with different permission levels:
 - Uses explicit whitelist from `CORS_ORIGINS` environment variable
 - Example: `CORS_ORIGINS=https://app.example.com,https://www.example.com`
 
-## 🚢 Deployment
-
-### Deployment Order
-
-**Always deploy in this order to prevent downtime:**
-
-1. **Backend First** → Wait for health check to pass
-2. **Frontend Second** → Connects to updated backend
-
-### Backend Deployment (Railway)
-
-1. **Create Railway Project**
-   ```bash
-   # Install Railway CLI
-   npm install -g @railway/cli
-   
-   # Login
-   railway login
-   
-   # Initialize project
-   railway init
-   ```
-
-2. **Add PostgreSQL and Redis**
-   - In Railway dashboard, add PostgreSQL plugin
-   - Add Redis plugin
-   - Note the connection URLs
-
-3. **Configure Environment Variables**
-   - Set all required environment variables in Railway dashboard
-   - Use Railway-provided DATABASE_URL and REDIS_URL
-
-4. **Deploy**
-   ```bash
-   railway up
-   ```
-
-### Frontend Deployment (Vercel)
-
-1. **Install Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
-
-2. **Link Project**
-   ```bash
-   cd frontend
-   vercel link
-   ```
-
-3. **Configure Environment Variables**
-   ```bash
-   vercel env add NEXT_PUBLIC_API_URL production
-   # Enter your backend URL
-   ```
-
-4. **Deploy**
-   ```bash
-   vercel --prod
-   ```
 
 ### Docker Deployment
 

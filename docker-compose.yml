@@ -1,0 +1,282 @@
+version: '3.8'
+
+services:
+  # PostgreSQL 18 Database
+  postgres:
+    image: postgres:18-alpine
+    container_name: churn-postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-churn_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-churn_password}
+      POSTGRES_DB: ${POSTGRES_DB:-churn_prediction}
+      POSTGRES_HOST_AUTH_METHOD: scram-sha-256
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-churn_user} -d ${POSTGRES_DB:-churn_prediction}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - churn-network
+
+  # Redis Cache and Task Queue
+  redis:
+    image: redis:7-alpine
+    container_name: churn-redis
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-redis_password}
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - churn-network
+
+  # MinIO (S3-compatible storage for local development)
+  minio:
+    image: minio/minio:latest
+    container_name: churn-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - churn-network
+
+  # MinIO Client - Create buckets on startup
+  minio-init:
+    image: minio/mc:latest
+    container_name: churn-minio-init
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 ${MINIO_ROOT_USER:-minioadmin} ${MINIO_ROOT_PASSWORD:-minioadmin123};
+      mc mb myminio/models --ignore-existing;
+      mc mb myminio/reports --ignore-existing;
+      mc mb myminio/exports --ignore-existing;
+      mc anonymous set download myminio/reports;
+      echo 'MinIO buckets created successfully';
+      "
+    networks:
+      - churn-network
+
+  # MLflow Tracking Server
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.18.0
+    container_name: churn-mlflow
+    command: >
+      mlflow server
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root s3://mlflow-artifacts/
+      --host 0.0.0.0
+      --port 5000
+    environment:
+      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+    ports:
+      - "${MLFLOW_PORT:-5000}:5000"
+    volumes:
+      - mlflow_data:/mlflow
+    depends_on:
+      minio:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    networks:
+      - churn-network
+
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+    container_name: churn-backend
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    environment:
+      # Python Path
+      PYTHONPATH: /app
+      
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-churn_user}:${POSTGRES_PASSWORD:-churn_password}@postgres:5432/${POSTGRES_DB:-churn_prediction}
+      DATABASE_POOL_SIZE: 20
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/2
+      
+      # Object Storage (MinIO)
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_BUCKET_MODELS: models
+      S3_BUCKET_REPORTS: reports
+      S3_BUCKET_EXPORTS: exports
+      S3_REGION: us-east-1
+      
+      # MLflow
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      
+      # Auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 24
+      PASSWORD_BCRYPT_ROUNDS: 12
+      
+      # Encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-base64-encoded-32-byte-key-change-in-production}
+      
+      # Application
+      ENVIRONMENT: development
+      DEBUG: "true"
+      LOG_LEVEL: INFO
+      # CORS Configuration
+      # Development: Accepts all localhost variations (localhost, 127.0.0.1, any port)
+      # Production: Use explicit whitelist of allowed origins
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001,http://127.0.0.1:3000,http://frontend:3000
+      
+      # Rate Limiting
+      RATE_LIMIT_PER_MINUTE: 100
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    # volumes:
+    #   - ./backend:/app/backend
+    #   - backend_cache:/root/.cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - churn-network
+
+  # Celery Worker for Background Tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.13}
+    container_name: churn-celery-worker
+    command: celery -A backend.workers.celery_app worker --loglevel=info --concurrency=4
+    environment:
+      # Python Path
+      PYTHONPATH: /app
+      
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-churn_user}:${POSTGRES_PASSWORD:-churn_password}@postgres:5432/${POSTGRES_DB:-churn_prediction}
+      
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_password}@redis:6379/2
+      
+      # Object Storage (MinIO)
+      S3_ENDPOINT_URL: http://minio:9000
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      S3_BUCKET_MODELS: models
+      S3_BUCKET_REPORTS: reports
+      S3_BUCKET_EXPORTS: exports
+      S3_REGION: us-east-1
+      
+      # MLflow
+      MLFLOW_TRACKING_URI: http://mlflow:5000
+      
+      # Auth
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 24
+      PASSWORD_BCRYPT_ROUNDS: 12
+      
+      # Encryption
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-your-base64-encoded-32-byte-key-change-in-production}
+      
+      # Application
+      ENVIRONMENT: development
+      LOG_LEVEL: INFO
+    # volumes:
+    #   - ./backend:/app/backend
+    #   - celery_cache:/root/.cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      mlflow:
+        condition: service_started
+    networks:
+      - churn-network
+
+  # Frontend (Next.js)
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+      args:
+        NODE_VERSION: ${NODE_VERSION:-20}
+    container_name: churn-frontend
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000
+      NEXT_PUBLIC_WS_URL: ws://localhost:8000/api/v1/ws
+      NODE_ENV: development
+    ports:
+      - "${FRONTEND_PORT:-3000}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - churn-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  minio_data:
+    driver: local
+  mlflow_data:
+    driver: local
+  backend_cache:
+    driver: local
+  celery_cache:
+    driver: local
+
+networks:
+  churn-network:
+    driver: bridge

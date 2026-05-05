@@ -1,0 +1,139 @@
+# Production Docker Compose Configuration
+# This is a reference configuration for production deployment
+# Adjust based on your infrastructure requirements
+
+version: '3.8'
+
+services:
+  # Backend API (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: 3.13
+      target: base
+    container_name: churn-backend-prod
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --workers 4
+    environment:
+      # Use managed PostgreSQL (Railway, AWS RDS, etc.)
+      DATABASE_URL: ${DATABASE_URL}
+      DATABASE_POOL_SIZE: 20
+      
+      # Use managed Redis (Railway, AWS ElastiCache, etc.)
+      REDIS_URL: ${REDIS_URL}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      
+      # Use Cloudflare R2 (not MinIO)
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET_MODELS: ${S3_BUCKET_MODELS}
+      S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS}
+      S3_BUCKET_EXPORTS: ${S3_BUCKET_EXPORTS}
+      S3_REGION: auto
+      
+      # Use managed MLflow or Railway deployment
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      
+      # Strong JWT secret (use secrets management)
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      JWT_EXPIRATION_HOURS: 24
+      PASSWORD_BCRYPT_ROUNDS: 12
+      
+      # Production settings
+      ENVIRONMENT: production
+      DEBUG: "false"
+      LOG_LEVEL: INFO
+      CORS_ORIGINS: ${CORS_ORIGINS}
+      
+      # Rate Limiting
+      RATE_LIMIT_PER_MINUTE: 100
+    ports:
+      - "8000:8000"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - churn-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Celery Worker for Background Tasks
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.celery
+      args:
+        PYTHON_VERSION: 3.13
+    container_name: churn-celery-worker-prod
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=4 --max-tasks-per-child=1000
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: ${REDIS_URL}
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
+      S3_ENDPOINT_URL: ${S3_ENDPOINT_URL}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET_MODELS: ${S3_BUCKET_MODELS}
+      S3_BUCKET_REPORTS: ${S3_BUCKET_REPORTS}
+      S3_BUCKET_EXPORTS: ${S3_BUCKET_EXPORTS}
+      S3_REGION: auto
+      MLFLOW_TRACKING_URI: ${MLFLOW_TRACKING_URI}
+      ENVIRONMENT: production
+      LOG_LEVEL: INFO
+    restart: unless-stopped
+    networks:
+      - churn-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Frontend (Next.js) - Usually deployed to Vercel
+  # This is included for self-hosted scenarios
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NODE_VERSION: 20
+      target: runner
+    container_name: churn-frontend-prod
+    environment:
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL}
+      NODE_ENV: production
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    depends_on:
+      - backend
+    networks:
+      - churn-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  churn-network:
+    driver: bridge
+
+# Note: In production, use managed services instead of Docker volumes:
+# - PostgreSQL: Railway, AWS RDS, Google Cloud SQL
+# - Redis: Railway, AWS ElastiCache, Redis Cloud
+# - Object Storage: Cloudflare R2, AWS S3
+# - MLflow: Managed deployment or Railway

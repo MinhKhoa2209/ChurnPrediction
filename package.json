@@ -1,0 +1,29 @@
+{
+  "name": "customer-churn-prediction-platform",
+  "version": "1.0.0",
+  "description": "Customer Churn Prediction Platform - Monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "shared"
+  ],
+  "scripts": {
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:backend": "cd backend && python main.py",
+    "build:frontend": "cd frontend && npm run build",
+    "build:shared": "cd shared && npm run build",
+    "build": "npm run build:shared && npm run build:frontend",
+    "install:all": "npm install && cd frontend && npm install && cd ../shared && npm install",
+    "clean": "rm -rf frontend/.next frontend/out shared/dist backend/__pycache__"
+  },
+  "keywords": [
+    "machine-learning",
+    "churn-prediction",
+    "fastapi",
+    "nextjs",
+    "typescript"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {}
+}

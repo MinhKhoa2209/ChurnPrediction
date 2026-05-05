@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple CORS Test</title>
+</head>
+<body>
+    <h1>Simple CORS Test</h1>
+    <button onclick="test()">Test Connection</button>
+    <pre id="result"></pre>
+
+    <script>
+        async function test() {
+            const result = document.getElementById('result');
+            result.textContent = 'Testing...\n';
+            
+            // Test 1: Can we reach the backend at all?
+            try {
+                result.textContent += '\n1. Testing http://localhost:8000/health...\n';
+                const response = await fetch('http://localhost:8000/health');
+                result.textContent += `   ✅ Connected! Status: ${response.status}\n`;
+                result.textContent += `   Headers: ${JSON.stringify([...response.headers.entries()])}\n`;
+                const data = await response.json();
+                result.textContent += `   Data: ${JSON.stringify(data).substring(0, 100)}...\n`;
+            } catch (error) {
+                result.textContent += `   ❌ ERROR: ${error.message}\n`;
+                result.textContent += `   Error type: ${error.constructor.name}\n`;
+            }
+            
+            // Test 2: Try with 127.0.0.1
+            try {
+                result.textContent += '\n2. Testing http://127.0.0.1:8000/health...\n';
+                const response = await fetch('http://127.0.0.1:8000/health');
+                result.textContent += `   ✅ Connected! Status: ${response.status}\n`;
+            } catch (error) {
+                result.textContent += `   ❌ ERROR: ${error.message}\n`;
+            }
+            
+            // Test 3: Check if it's a CORS issue or connection issue
+            try {
+                result.textContent += '\n3. Testing with no-cors mode...\n';
+                const response = await fetch('http://localhost:8000/health', { mode: 'no-cors' });
+                result.textContent += `   ✅ Connected (no-cors)! Status: ${response.status}\n`;
+                result.textContent += `   Type: ${response.type}\n`;
+            } catch (error) {
+                result.textContent += `   ❌ ERROR: ${error.message}\n`;
+            }
+        }
+    </script>
+</body>
+</html>
