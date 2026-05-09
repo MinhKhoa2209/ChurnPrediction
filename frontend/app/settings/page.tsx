@@ -1,22 +1,9 @@
-/**
- * User Settings Page
- * Provides user settings interface with:
- * - Profile information display (read-only)
- * - Theme selector (light/dark/system)
- * - Email notification preferences toggle
- * - Accessible form controls
- * - Responsive design
- */
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { useTheme } from '@/lib/theme-provider';
-
-interface NotificationSettings {
-  emailNotificationsEnabled: boolean;
-}
+import { useTheme } from 'next-themes';
+import { API_BASE_URL } from '@/lib/api';
 
 export default function SettingsPage() {
   const { user, token } = useAuthStore();
@@ -25,10 +12,11 @@ export default function SettingsPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
 
-  // Initialize email notifications from user data
   useEffect(() => {
     if (user) {
-      setEmailNotifications(user.email_notifications_enabled || false);
+      queueMicrotask(() => {
+        setEmailNotifications(user.email_notifications_enabled || false);
+      });
     }
   }, [user]);
 
@@ -39,7 +27,7 @@ export default function SettingsPage() {
     setSaveMessage(null);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/auth/settings`, {
+      const response = await fetch(`${API_BASE_URL}/auth/settings`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -56,7 +44,6 @@ export default function SettingsPage() {
 
       setSaveMessage({ type: 'success', text: 'Notification preferences saved successfully' });
       
-      // Clear success message after 3 seconds
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       console.error('Error saving notification preferences:', error);
@@ -69,28 +56,27 @@ export default function SettingsPage() {
   if (!user) {
     return (
       <div className="max-w-4xl mx-auto py-8 px-4">
-        <p className="text-gray-600 dark:text-gray-400">Loading...</p>
+        <p className="text-muted-foreground">Loading...</p>
       </div>
     );
   }
 
   return (
     <div className="max-w-4xl mx-auto py-8 px-4">
-      <h1 className="text-3xl font-bold mb-8 text-gray-900 dark:text-white">Settings</h1>
+      <h1 className="text-3xl font-bold mb-8 text-foreground">Settings</h1>
 
-      {/* Profile Settings */}
       <section 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6"
+        className="bg-card rounded-lg shadow p-6 mb-6"
         aria-labelledby="profile-heading"
       >
-        <h2 id="profile-heading" className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+        <h2 id="profile-heading" className="text-xl font-semibold mb-4 text-foreground">
           Profile
         </h2>
         <div className="space-y-4">
           <div>
             <label 
               htmlFor="email" 
-              className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium mb-2 text-muted-foreground"
             >
               Email
             </label>
@@ -99,17 +85,17 @@ export default function SettingsPage() {
               type="email"
               value={user.email}
               disabled
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
               aria-describedby="email-description"
             />
-            <p id="email-description" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p id="email-description" className="mt-1 text-xs text-muted-foreground">
               Email cannot be changed
             </p>
           </div>
           <div>
             <label 
               htmlFor="role" 
-              className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
+              className="block text-sm font-medium mb-2 text-muted-foreground"
             >
               Role
             </label>
@@ -118,28 +104,27 @@ export default function SettingsPage() {
               type="text"
               value={user.role}
               disabled
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-muted text-muted-foreground cursor-not-allowed"
               aria-describedby="role-description"
             />
-            <p id="role-description" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+            <p id="role-description" className="mt-1 text-xs text-muted-foreground">
               Role is assigned by administrators
             </p>
           </div>
         </div>
       </section>
 
-      {/* Theme Settings */}
       <section 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-6"
+        className="bg-card rounded-lg shadow p-6 mb-6"
         aria-labelledby="appearance-heading"
       >
-        <h2 id="appearance-heading" className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+        <h2 id="appearance-heading" className="text-xl font-semibold mb-4 text-foreground">
           Appearance
         </h2>
         <div>
           <label 
             htmlFor="theme" 
-            className="block text-sm font-medium mb-2 text-gray-700 dark:text-gray-300"
+            className="block text-sm font-medium mb-2 text-muted-foreground"
           >
             Theme
           </label>
@@ -147,25 +132,24 @@ export default function SettingsPage() {
             id="theme"
             value={theme}
             onChange={(e) => setTheme(e.target.value as 'light' | 'dark' | 'system')}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
             aria-describedby="theme-description"
           >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
             <option value="system">System</option>
           </select>
-          <p id="theme-description" className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          <p id="theme-description" className="mt-1 text-xs text-muted-foreground">
             Choose your preferred color theme. System will match your device settings.
           </p>
         </div>
       </section>
 
-      {/* Notification Settings */}
       <section 
-        className="bg-white dark:bg-gray-800 rounded-lg shadow p-6"
+        className="bg-card rounded-lg shadow p-6"
         aria-labelledby="notifications-heading"
       >
-        <h2 id="notifications-heading" className="text-xl font-semibold mb-4 text-gray-900 dark:text-white">
+        <h2 id="notifications-heading" className="text-xl font-semibold mb-4 text-foreground">
           Notifications
         </h2>
         <div className="space-y-4">
@@ -176,18 +160,18 @@ export default function SettingsPage() {
                 type="checkbox"
                 checked={emailNotifications}
                 onChange={(e) => setEmailNotifications(e.target.checked)}
-                className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-gray-700 border-gray-300 dark:border-gray-600 rounded focus:ring-blue-500 focus:ring-2"
+                className="w-4 h-4 text-primary bg-input border-border rounded focus:ring-ring focus:ring-2"
                 aria-describedby="email-notifications-description"
               />
             </div>
             <div className="ml-3">
               <label 
                 htmlFor="email-notifications" 
-                className="text-sm font-medium text-gray-900 dark:text-white cursor-pointer"
+                className="text-sm font-medium text-foreground cursor-pointer"
               >
                 Email notifications
               </label>
-              <p id="email-notifications-description" className="text-xs text-gray-500 dark:text-gray-400">
+              <p id="email-notifications-description" className="text-xs text-muted-foreground">
                 Receive email notifications when training jobs complete or fail
               </p>
             </div>
@@ -210,7 +194,7 @@ export default function SettingsPage() {
           <button
             onClick={handleSaveNotifications}
             disabled={isLoading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             aria-label="Save notification preferences"
           >
             {isLoading ? 'Saving...' : 'Save Preferences'}

@@ -1,7 +1,3 @@
-/**
- * Data Upload Page
- * Protected route - requires authentication
-
 'use client';
 
 import { useState } from 'react';
@@ -42,8 +38,7 @@ export default function DataUploadPage() {
       setUploadError(null);
       setUploadProgress(0);
 
-      // Upload file with progress tracking (Requirement 3.7)
-      const response = await api.upload<Dataset>(
+    const response = await api.upload<Dataset>(
         '/datasets/upload',
         selectedFile,
         token,
@@ -52,18 +47,15 @@ export default function DataUploadPage() {
         }
       );
 
-      // Add dataset to store
-      addDataset(response);
-      setCurrentDataset(response);
+    addDataset(response);
+    setCurrentDataset(response);
 
-      // Reset form
-      setSelectedFile(null);
-      setUploadProgress(100);
+    setSelectedFile(null);
+    setUploadProgress(100);
 
-      // Show success message briefly before resetting
-      setTimeout(() => {
-        resetUpload();
-      }, 2000);
+    setTimeout(() => {
+      resetUpload();
+    }, 2000);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       setUploadError(errorMessage);
@@ -82,34 +74,33 @@ export default function DataUploadPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground">Loading...</div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
-  // Check if user has permission to upload data (Data_Scientist or Admin)
   const canUpload = user.role === 'Admin' || user.role === 'Data_Scientist';
 
   if (!canUpload) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <nav className="bg-white dark:bg-gray-800 shadow">
+      <div className="min-h-screen bg-gray-50 dark:bg-background">
+        <nav className="bg-white dark:bg-card shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                   Data Upload
                 </h1>
               </div>
               <div className="flex items-center">
                 <button
                   onClick={handleBackToDashboard}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
                 >
                   Back to Dashboard
                 </button>
@@ -135,12 +126,12 @@ export default function DataUploadPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Upload Customer Data
               </h1>
             </div>
@@ -150,7 +141,7 @@ export default function DataUploadPage() {
               </span>
               <button
                 onClick={handleBackToDashboard}
-                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
               >
                 Back to Dashboard
               </button>
@@ -161,20 +152,18 @@ export default function DataUploadPage() {
 
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-6">
               Upload Dataset
             </h2>
 
             <div className="space-y-6">
-              {/* File Upload Component */}
               <FileUpload
                 onFileSelect={handleFileSelect}
                 maxSizeMB={50}
                 disabled={isUploading}
               />
 
-              {/* Selected File Info */}
               {selectedFile && !isUploading && (
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <div className="flex items-center justify-between">
@@ -196,7 +185,6 @@ export default function DataUploadPage() {
                 </div>
               )}
 
-              {/* Upload Progress (Requirement 3.7) */}
               {isUploading && (
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
@@ -207,7 +195,7 @@ export default function DataUploadPage() {
                       {uploadProgress}%
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+                  <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2.5">
                     <div
                       className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
                       style={{ width: `${uploadProgress}%` }}
@@ -221,7 +209,6 @@ export default function DataUploadPage() {
                 </div>
               )}
 
-              {/* Upload Error (Requirement 3.3) */}
               {uploadError && (
                 <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                   <div className="flex">
@@ -251,7 +238,6 @@ export default function DataUploadPage() {
                 </div>
               )}
 
-              {/* Success Message */}
               {currentDataset && !isUploading && !uploadError && uploadProgress === 100 && (
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                   <div className="flex">
@@ -285,19 +271,18 @@ export default function DataUploadPage() {
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={handleCancel}
                   disabled={isUploading}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
                   disabled={!selectedFile || isUploading}
-                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium text-primary-foreground bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUploading ? 'Uploading...' : 'Upload Dataset'}
                 </button>
@@ -305,9 +290,8 @@ export default function DataUploadPage() {
             </div>
           </div>
 
-          {/* Information Panel */}
-          <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="mt-6 bg-white dark:bg-card shadow rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-4">
               Dataset Requirements
             </h3>
             <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">

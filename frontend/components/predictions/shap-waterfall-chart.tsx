@@ -1,10 +1,3 @@
-/**
- * SHAP Waterfall Chart Component
- * Requirement 12.8: Display feature contributions using SHAP values
- * 
- * Visualizes how each feature contributes to the final prediction,
- * showing the cumulative effect from base value to final prediction.
- */
 
 'use client';
 
@@ -23,18 +16,24 @@ interface WaterfallDataPoint {
   displayValue: string;
 }
 
+interface WaterfallTooltipPayload {
+  payload: WaterfallDataPoint;
+}
+
+interface WaterfallTooltipProps {
+  active?: boolean;
+  payload?: WaterfallTooltipPayload[];
+}
+
 export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartProps) {
-  // Combine and sort all contributions by absolute value
   const allContributions = [
     ...shapValues.top_positive,
     ...shapValues.top_negative,
   ].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
 
-  // Build waterfall data
   const waterfallData: WaterfallDataPoint[] = [];
   let cumulativeValue = shapValues.base_value;
 
-  // Add base value
   waterfallData.push({
     feature: 'Base Value',
     contribution: shapValues.base_value,
@@ -43,7 +42,6 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
     displayValue: `${(shapValues.base_value * 100).toFixed(1)}%`,
   });
 
-  // Add each contribution
   allContributions.forEach((contrib) => {
     const newCumulative = cumulativeValue + contrib.contribution;
     waterfallData.push({
@@ -56,7 +54,6 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
     cumulativeValue = newCumulative;
   });
 
-  // Add final prediction value
   waterfallData.push({
     feature: 'Final Prediction',
     contribution: shapValues.prediction_value,
@@ -65,13 +62,12 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
     displayValue: `${(shapValues.prediction_value * 100).toFixed(1)}%`,
   });
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
+  const CustomTooltip = ({ active, payload }: WaterfallTooltipProps) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload as WaterfallDataPoint;
       return (
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-3">
-          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-1">
+        <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg p-3">
+          <p className="text-sm font-semibold text-gray-900 dark:text-foreground mb-1">
             {data.feature}
           </p>
           <p className={`text-sm font-medium ${data.isPositive ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
@@ -122,10 +118,10 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
                 key={`cell-${index}`}
                 fill={
                   entry.feature === 'Base Value' || entry.feature === 'Final Prediction'
-                    ? '#3b82f6' // Blue for base and final
+                    ? '#3b82f6'
                     : entry.isPositive
-                    ? '#ef4444' // Red for positive (increases churn)
-                    : '#10b981' // Green for negative (decreases churn)
+                    ? '#ef4444'
+                    : '#10b981'
                 }
               />
             ))}
@@ -133,7 +129,6 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
         </BarChart>
       </ResponsiveContainer>
 
-      {/* Legend */}
       <div className="flex items-center justify-center gap-6 mt-4 text-sm">
         <div className="flex items-center">
           <div className="w-4 h-4 bg-blue-500 rounded mr-2"></div>
@@ -149,8 +144,7 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
         </div>
       </div>
 
-      {/* Explanation */}
-      <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 rounded-lg">
+      <div className="mt-4 p-4 bg-gray-50 dark:bg-background rounded-lg">
         <p className="text-xs text-gray-600 dark:text-gray-400">
           <strong>How to read this chart:</strong> The waterfall chart shows how the prediction builds up from the base value (average prediction for all customers) 
           through each feature's contribution to reach the final prediction. Red bars push the probability higher (toward churn), 

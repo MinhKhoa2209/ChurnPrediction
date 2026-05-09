@@ -1,6 +1,7 @@
 """
 Error Response Schemas and Error Codes
 Structured error handling for the Customer Churn Prediction Platform
+"""
 
 from datetime import datetime
 from enum import Enum

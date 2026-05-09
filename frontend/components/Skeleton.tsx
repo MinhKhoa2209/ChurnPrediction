@@ -1,12 +1,7 @@
-/**
- * Skeleton Loading Components
- * Provides skeleton screens for better loading UX
- */
-
 export function Skeleton({ className = '' }: { className?: string }) {
   return (
     <div
-      className={`animate-pulse bg-gray-200 dark:bg-gray-700 rounded ${className}`}
+      className={`animate-pulse bg-muted rounded ${className}`}
       role="status"
       aria-label="Loading"
     >
@@ -17,7 +12,7 @@ export function Skeleton({ className = '' }: { className?: string }) {
 
 export function CardSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+    <div className="bg-card shadow rounded-lg p-6">
       <Skeleton className="h-4 w-1/4 mb-4" />
       <Skeleton className="h-8 w-1/2 mb-2" />
       <Skeleton className="h-4 w-3/4" />
@@ -37,7 +32,7 @@ export function TableSkeleton({ rows = 5 }: { rows?: number }) {
 
 export function ChartSkeleton() {
   return (
-    <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+    <div className="bg-card shadow rounded-lg p-6">
       <Skeleton className="h-6 w-1/3 mb-4" />
       <Skeleton className="h-64 w-full" />
     </div>
@@ -47,14 +42,12 @@ export function ChartSkeleton() {
 export function DashboardSkeleton() {
   return (
     <div className="space-y-6">
-      {/* Metrics Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <CardSkeleton />
         <CardSkeleton />
         <CardSkeleton />
       </div>
       
-      {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <ChartSkeleton />
         <ChartSkeleton />

@@ -1,13 +1,3 @@
-/**
- * Batch Prediction Page
- * Provides interface for batch customer churn predictions:
- * - CSV file upload with drag-and-drop (Req 13.1)
- * - File validation and progress tracking (Req 13.2)
- * - Batch processing status display (Req 13.3, 13.4)
- * - Paginated results table with 50 rows per page (Req 13.6)
- * - CSV export download (Req 13.7)
- */
-
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
@@ -28,28 +18,23 @@ export default function BatchPredictionPage() {
   const router = useRouter();
   const { user, token, isLoading: authLoading } = useAuthStore();
 
-  // Model selection state
   const [modelVersions, setModelVersions] = useState<ModelVersionListItem[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
   const [isLoadingModels, setIsLoadingModels] = useState(true);
 
-  // Upload state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
-  // Batch results state
   const [batchData, setBatchData] = useState<BatchPredictionUploadResponse | null>(null);
   const [results, setResults] = useState<BatchPredictionResultsResponse | null>(null);
   const [isLoadingResults, setIsLoadingResults] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Drag and drop state
   const [isDragging, setIsDragging] = useState(false);
 
-  // Load model versions on mount
   useEffect(() => {
     if (!token) return;
 
@@ -72,16 +57,13 @@ export default function BatchPredictionPage() {
     fetchModels();
   }, [token]);
 
-  // Handle file selection
   const handleFileSelect = (file: File) => {
-    // Validate file type
     if (!file.name.endsWith('.csv')) {
       setUploadError('Please select a CSV file');
       return;
     }
 
-    // Validate file size (50MB max per Requirement 3.1)
-    const maxSize = 50 * 1024 * 1024; // 50MB
+    const maxSize = 50 * 1024 * 1024;
     if (file.size > maxSize) {
       setUploadError('File size must be less than 50MB');
       return;
@@ -91,7 +73,6 @@ export default function BatchPredictionPage() {
     setUploadError(null);
   };
 
-  // Handle drag and drop
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -112,7 +93,6 @@ export default function BatchPredictionPage() {
     }
   }, []);
 
-  // Handle file input change
   const handleFileInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (files && files.length > 0) {
@@ -120,7 +100,6 @@ export default function BatchPredictionPage() {
     }
   };
 
-  // Handle batch upload
   const handleUpload = async () => {
     if (!selectedFile || !selectedModelId || !token) {
       setUploadError('Please select a file and model version');
@@ -141,7 +120,6 @@ export default function BatchPredictionPage() {
 
       setBatchData(response);
       
-      // Start polling for results if processing
       if (response.status === 'processing' || response.status === 'completed') {
         await loadResults(response.batch_id, 1);
       }
@@ -153,7 +131,6 @@ export default function BatchPredictionPage() {
     }
   };
 
-  // Load batch results
   const loadResults = async (batchId: string, page: number) => {
     if (!token) return;
 
@@ -170,14 +147,12 @@ export default function BatchPredictionPage() {
     }
   };
 
-  // Handle page change
   const handlePageChange = (newPage: number) => {
     if (batchData) {
       loadResults(batchData.batch_id, newPage);
     }
   };
 
-  // Handle CSV download
   const handleDownloadCSV = async () => {
     if (!batchData || !token) return;
 
@@ -185,7 +160,6 @@ export default function BatchPredictionPage() {
       setIsDownloading(true);
       const blob = await downloadBatchPredictionCSV(batchData.batch_id, token);
       
-      // Create download link
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -202,7 +176,6 @@ export default function BatchPredictionPage() {
     }
   };
 
-  // Reset form
   const handleReset = () => {
     setSelectedFile(null);
     setUploadProgress(0);
@@ -214,20 +187,19 @@ export default function BatchPredictionPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground">Loading...</div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -237,7 +209,7 @@ export default function BatchPredictionPage() {
               >
                 ← Back to Predictions
               </button>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Batch Churn Prediction
               </h1>
             </div>
@@ -252,9 +224,8 @@ export default function BatchPredictionPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0 space-y-6">
-          {/* Model Selection */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground mb-4">
               Select Model Version
             </h2>
             
@@ -274,7 +245,7 @@ export default function BatchPredictionPage() {
                 value={selectedModelId}
                 onChange={(e) => setSelectedModelId(e.target.value)}
                 disabled={isUploading}
-                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:opacity-50"
               >
                 {modelVersions.map((model) => (
                   <option key={model.id} value={model.id}>
@@ -285,13 +256,11 @@ export default function BatchPredictionPage() {
             )}
           </div>
 
-          {/* File Upload */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground mb-4">
               Upload Customer Data
             </h2>
 
-            {/* Drag and Drop Zone */}
             <div
               onDragOver={handleDragOver}
               onDragLeave={handleDragLeave}
@@ -299,7 +268,7 @@ export default function BatchPredictionPage() {
               className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
                 isDragging
                   ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                  : 'border-gray-300 dark:border-gray-600'
+                  : 'border-gray-300 dark:border-border'
               } ${isUploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
             >
               <input
@@ -326,7 +295,7 @@ export default function BatchPredictionPage() {
                       d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
                     />
                   </svg>
-                  <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  <p className="text-sm font-medium text-gray-900 dark:text-foreground">
                     {selectedFile.name}
                   </p>
                   <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -369,14 +338,13 @@ export default function BatchPredictionPage() {
               )}
             </div>
 
-            {/* Upload Progress */}
             {isUploading && (
               <div className="mt-4">
                 <div className="flex justify-between text-sm text-gray-700 dark:text-gray-300 mb-2">
                   <span>Uploading...</span>
                   <span>{uploadProgress}%</span>
                 </div>
-                <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2">
                   <div
                     className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                     style={{ width: `${uploadProgress}%` }}
@@ -385,20 +353,18 @@ export default function BatchPredictionPage() {
               </div>
             )}
 
-            {/* Error Display */}
             {uploadError && (
               <div className="mt-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
                 <p className="text-sm text-red-800 dark:text-red-200">{uploadError}</p>
               </div>
             )}
 
-            {/* Upload Button */}
             <div className="mt-6 flex justify-end gap-3">
               {batchData && (
                 <button
                   onClick={handleReset}
                   disabled={isUploading}
-                  className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-muted hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   New Batch
                 </button>
@@ -406,36 +372,35 @@ export default function BatchPredictionPage() {
               <button
                 onClick={handleUpload}
                 disabled={!selectedFile || !selectedModelId || isUploading || modelVersions.length === 0}
-                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-primary-foreground rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isUploading ? 'Uploading...' : 'Upload and Process'}
               </button>
             </div>
           </div>
 
-          {/* Batch Status */}
           {batchData && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-foreground mb-4">
                 Batch Processing Status
               </h2>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-muted rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Status</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white capitalize">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-foreground capitalize">
                     {batchData.status}
                   </p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-muted rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Total Records</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-foreground">
                     {batchData.record_count}
                   </p>
                 </div>
-                <div className="bg-gray-50 dark:bg-gray-700 rounded-lg p-4">
+                <div className="bg-gray-50 dark:bg-muted rounded-lg p-4">
                   <p className="text-sm text-gray-600 dark:text-gray-400">Processed</p>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-white">
+                  <p className="text-lg font-semibold text-gray-900 dark:text-foreground">
                     {results?.processed_count || 0} / {batchData.record_count}
                   </p>
                 </div>
@@ -443,17 +408,16 @@ export default function BatchPredictionPage() {
             </div>
           )}
 
-          {/* Results Table */}
           {results && results.results.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                <h2 className="text-lg font-bold text-gray-900 dark:text-foreground">
                   Prediction Results
                 </h2>
                 <button
                   onClick={handleDownloadCSV}
                   disabled={isDownloading || batchData?.status !== 'completed'}
-                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-primary-foreground rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
                 >
                   {isDownloading ? (
                     <>
@@ -499,10 +463,9 @@ export default function BatchPredictionPage() {
                 </button>
               </div>
 
-              {/* Table */}
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                  <thead className="bg-gray-50 dark:bg-gray-700">
+                <table className="min-w-full divide-y divide-gray-200 dark:divide-border">
+                  <thead className="bg-gray-50 dark:bg-muted">
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                         Customer
@@ -524,21 +487,21 @@ export default function BatchPredictionPage() {
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                  <tbody className="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
                     {results.results.map((result) => {
                       const color = getProbabilityColor(result.probability);
                       return (
                         <tr key={result.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-foreground">
                             {result.input_features.gender}, {result.input_features.SeniorCitizen === 1 ? 'Senior' : 'Non-Senior'}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-foreground">
                             {result.input_features.tenure} months
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-foreground">
                             {result.input_features.Contract}
                           </td>
-                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-white">
+                          <td className="px-4 py-3 text-sm text-gray-900 dark:text-foreground">
                             ${result.input_features.MonthlyCharges.toFixed(2)}
                           </td>
                           <td className="px-4 py-3 text-sm">
@@ -564,9 +527,8 @@ export default function BatchPredictionPage() {
                 </table>
               </div>
 
-              {/* Pagination */}
               {results.total_pages > 1 && (
-                <div className="mt-6 flex items-center justify-between border-t border-gray-200 dark:border-gray-700 pt-4">
+                <div className="mt-6 flex items-center justify-between border-t border-gray-200 dark:border-border pt-4">
                   <div className="text-sm text-gray-700 dark:text-gray-300">
                     Showing page {results.page} of {results.total_pages} ({results.total} total results)
                   </div>
@@ -574,12 +536,11 @@ export default function BatchPredictionPage() {
                     <button
                       onClick={() => handlePageChange(currentPage - 1)}
                       disabled={currentPage === 1 || isLoadingResults}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Previous
                     </button>
                     
-                    {/* Page numbers */}
                     <div className="flex gap-1">
                       {Array.from({ length: Math.min(5, results.total_pages) }, (_, i) => {
                         let pageNum;
@@ -600,8 +561,8 @@ export default function BatchPredictionPage() {
                             disabled={isLoadingResults}
                             className={`px-3 py-2 text-sm font-medium rounded-lg ${
                               currentPage === pageNum
-                                ? 'bg-blue-600 text-white'
-                                : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-600'
+                                ? 'bg-blue-600 text-primary-foreground'
+                                : 'text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border hover:bg-gray-50 dark:hover:bg-gray-600'
                             } disabled:opacity-50 disabled:cursor-not-allowed`}
                           >
                             {pageNum}
@@ -613,7 +574,7 @@ export default function BatchPredictionPage() {
                     <button
                       onClick={() => handlePageChange(currentPage + 1)}
                       disabled={currentPage === results.total_pages || isLoadingResults}
-                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       Next
                     </button>
@@ -623,9 +584,8 @@ export default function BatchPredictionPage() {
             </div>
           )}
 
-          {/* Empty State */}
           {!batchData && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-12 text-center">
               <svg
                 className="mx-auto h-16 w-16 text-gray-300 dark:text-gray-600 mb-4"
                 fill="none"
@@ -639,7 +599,7 @@ export default function BatchPredictionPage() {
                   d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
                 />
               </svg>
-              <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
+              <h3 className="text-lg font-medium text-gray-900 dark:text-foreground mb-2">
                 No Batch Uploaded
               </h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">

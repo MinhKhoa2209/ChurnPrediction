@@ -1,11 +1,6 @@
-/**
- * Feature Engineering Page
- * Protected route - requires authentication
- */
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { api } from '@/lib/api';
@@ -16,12 +11,10 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   Cell,
 } from 'recharts';
 
-// Type definitions for API responses
 interface FeatureImportanceItem {
   featureName: string;
   importanceScore: number;
@@ -65,30 +58,21 @@ export default function FeatureEngineeringPage() {
   const datasetId = params.datasetId as string;
   const { user, token, isLoading: authLoading } = useAuthStore();
 
-  // State for feature importance data
   const [featureImportance, setFeatureImportance] = useState<FeatureImportanceResponse | null>(null);
   const [selectedFeatures, setSelectedFeatures] = useState<Set<string>>(new Set());
   const [importanceThreshold, setImportanceThreshold] = useState<number>(0.05);
   const [useThreshold, setUseThreshold] = useState<boolean>(false);
   const [interactionFeatures, setInteractionFeatures] = useState<InteractionFeaturesResponse | null>(null);
 
-  // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isCreatingInteraction, setIsCreatingInteraction] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  // Check if user has permission to modify features (Data_Scientist or Admin)
   const canModifyFeatures = user?.role === 'Admin' || user?.role === 'Data_Scientist';
 
-  useEffect(() => {
-    if (!authLoading && token && datasetId) {
-      fetchFeatureImportance();
-    }
-  }, [authLoading, token, datasetId]);
-
-  const fetchFeatureImportance = async () => {
+  const fetchFeatureImportance = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -100,7 +84,6 @@ export default function FeatureEngineeringPage() {
 
       setFeatureImportance(data);
 
-      // Initialize selected features with all features
       const allFeatureNames = new Set(data.featureImportance.map(f => f.featureName));
       setSelectedFeatures(allFeatureNames);
     } catch (err) {
@@ -109,7 +92,15 @@ export default function FeatureEngineeringPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [datasetId, token]);
+
+  useEffect(() => {
+    if (!authLoading && token && datasetId) {
+      queueMicrotask(() => {
+        void fetchFeatureImportance();
+      });
+    }
+  }, [authLoading, token, datasetId, fetchFeatureImportance]);
 
   const handleFeatureToggle = (featureName: string) => {
     if (!canModifyFeatures) return;
@@ -141,7 +132,6 @@ export default function FeatureEngineeringPage() {
     setImportanceThreshold(value);
     
     if (useThreshold && featureImportance) {
-      // Auto-select features above threshold
       const selected = new Set(
         featureImportance.featureImportance
           .filter(f => f.importanceScore >= value)
@@ -156,7 +146,6 @@ export default function FeatureEngineeringPage() {
     setUseThreshold(newUseThreshold);
 
     if (newUseThreshold && featureImportance) {
-      // Auto-select features above threshold
       const selected = new Set(
         featureImportance.featureImportance
           .filter(f => f.importanceScore >= importanceThreshold)
@@ -196,7 +185,6 @@ export default function FeatureEngineeringPage() {
         `Successfully saved ${response.selectedFeatures.length} features using ${response.selectionMethod} method`
       );
 
-      // Auto-hide success message after 5 seconds
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to save feature selection';
@@ -228,7 +216,6 @@ export default function FeatureEngineeringPage() {
         `Successfully created ${response.interactionFeatures.length} interaction feature(s)`
       );
 
-      // Auto-hide success message after 5 seconds
       setTimeout(() => setSuccessMessage(null), 5000);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to create interaction features';
@@ -242,7 +229,6 @@ export default function FeatureEngineeringPage() {
     router.push('/dashboard');
   };
 
-  // Calculate selected features statistics
   const getSelectedStats = () => {
     if (!featureImportance) return { count: 0, totalImportance: 0 };
 
@@ -258,7 +244,6 @@ export default function FeatureEngineeringPage() {
 
   const selectedStats = getSelectedStats();
 
-  // Prepare data for bar chart
   const chartData = featureImportance?.featureImportance.map(f => ({
     ...f,
     isSelected: selectedFeatures.has(f.featureName),
@@ -266,32 +251,32 @@ export default function FeatureEngineeringPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white mb-4">Loading feature importance...</div>
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground mb-4">Loading feature importance...</div>
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   if (error && !featureImportance) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <nav className="bg-white dark:bg-gray-800 shadow">
+      <div className="min-h-screen bg-gray-50 dark:bg-background">
+        <nav className="bg-white dark:bg-card shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                   Feature Engineering
                 </h1>
               </div>
               <div className="flex items-center">
                 <button
                   onClick={handleBackToDashboard}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
                 >
                   Back to Dashboard
                 </button>
@@ -315,12 +300,12 @@ export default function FeatureEngineeringPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Feature Engineering
               </h1>
             </div>
@@ -330,7 +315,7 @@ export default function FeatureEngineeringPage() {
               </span>
               <button
                 onClick={handleBackToDashboard}
-                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
               >
                 Back to Dashboard
               </button>
@@ -341,23 +326,20 @@ export default function FeatureEngineeringPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0 space-y-6">
-          {/* Success Message */}
           {successMessage && (
             <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
               <p className="text-sm text-green-800 dark:text-green-200">{successMessage}</p>
             </div>
           )}
 
-          {/* Error Message */}
           {error && featureImportance && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
             </div>
           )}
 
-          {/* Dataset Info */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-2">
               Feature Importance Analysis
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -371,10 +353,9 @@ export default function FeatureEngineeringPage() {
             </p>
           </div>
 
-          {/* Feature Importance Bar Chart */}
           {featureImportance && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-4">
                 Feature Importance Scores
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -400,7 +381,7 @@ export default function FeatureEngineeringPage() {
                       border: '1px solid #374151',
                       borderRadius: '0.5rem',
                     }}
-                    formatter={(value: any) => value.toFixed(4)}
+                    formatter={(value) => Number(value).toFixed(4)}
                   />
                   <Bar dataKey="importanceScore" radius={[0, 4, 4, 0]}>
                     {chartData.map((entry, index) => (
@@ -415,11 +396,10 @@ export default function FeatureEngineeringPage() {
             </div>
           )}
 
-          {/* Feature Selection Panel */}
           {featureImportance && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground">
                   Feature Selection
                 </h2>
                 {!canModifyFeatures && (
@@ -429,7 +409,6 @@ export default function FeatureEngineeringPage() {
                 )}
               </div>
 
-              {/* Selection Summary */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                   <p className="text-sm text-blue-600 dark:text-blue-400 mb-1">Selected Features</p>
@@ -451,9 +430,8 @@ export default function FeatureEngineeringPage() {
                 </div>
               </div>
 
-              {/* Threshold Selector */}
               {canModifyFeatures && (
-                <div className="mb-6 p-4 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <div className="mb-6 p-4 bg-gray-50 dark:bg-muted rounded-lg">
                   <div className="flex items-center mb-4">
                     <input
                       type="checkbox"
@@ -464,7 +442,7 @@ export default function FeatureEngineeringPage() {
                     />
                     <label
                       htmlFor="useThreshold"
-                      className="ml-2 text-sm font-medium text-gray-900 dark:text-white"
+                      className="ml-2 text-sm font-medium text-gray-900 dark:text-foreground"
                     >
                       Use importance threshold for auto-selection
                     </label>
@@ -482,7 +460,7 @@ export default function FeatureEngineeringPage() {
                         step="0.01"
                         value={importanceThreshold}
                         onChange={(e) => handleThresholdChange(parseFloat(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-gray-600"
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer dark:bg-muted"
                       />
                       <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400 mt-1">
                         <span>0.000</span>
@@ -493,25 +471,23 @@ export default function FeatureEngineeringPage() {
                 </div>
               )}
 
-              {/* Bulk Selection Buttons */}
               {canModifyFeatures && !useThreshold && (
                 <div className="flex space-x-2 mb-4">
                   <button
                     onClick={handleSelectAll}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm"
+                    className="px-4 py-2 bg-blue-600 text-primary-foreground rounded-lg hover:bg-blue-700 transition-colors text-sm"
                   >
                     Select All
                   </button>
                   <button
                     onClick={handleDeselectAll}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors text-sm"
+                    className="px-4 py-2 bg-gray-600 text-primary-foreground rounded-lg hover:bg-gray-700 transition-colors text-sm"
                   >
                     Deselect All
                   </button>
                 </div>
               )}
 
-              {/* Feature Checkboxes */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                 {featureImportance.featureImportance.map((feature) => (
                   <div
@@ -519,7 +495,7 @@ export default function FeatureEngineeringPage() {
                     className={`flex items-center p-3 rounded-lg border ${
                       selectedFeatures.has(feature.featureName)
                         ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
-                        : 'bg-gray-50 dark:bg-gray-700 border-gray-300 dark:border-gray-600'
+                        : 'bg-gray-50 dark:bg-muted border-gray-300 dark:border-border'
                     }`}
                   >
                     <input
@@ -534,7 +510,7 @@ export default function FeatureEngineeringPage() {
                       htmlFor={feature.featureName}
                       className="ml-3 flex-1 cursor-pointer"
                     >
-                      <span className="block text-sm font-medium text-gray-900 dark:text-white">
+                      <span className="block text-sm font-medium text-gray-900 dark:text-foreground">
                         {feature.featureName}
                       </span>
                       <span className="block text-xs text-gray-600 dark:text-gray-400">
@@ -545,12 +521,11 @@ export default function FeatureEngineeringPage() {
                 ))}
               </div>
 
-              {/* Save Button */}
               {canModifyFeatures && (
                 <button
                   onClick={handleSaveSelection}
                   disabled={isSaving || selectedFeatures.size === 0}
-                  className="w-full px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                  className="w-full px-6 py-3 bg-green-600 text-primary-foreground rounded-lg hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
                 >
                   {isSaving ? 'Saving...' : `Save Selection (${selectedStats.count} features)`}
                 </button>
@@ -558,9 +533,8 @@ export default function FeatureEngineeringPage() {
             </div>
           )}
 
-          {/* Interaction Features */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-4">
               Interaction Features
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
@@ -572,7 +546,7 @@ export default function FeatureEngineeringPage() {
               <button
                 onClick={handleCreateInteractionFeatures}
                 disabled={isCreatingInteraction}
-                className="mb-6 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
+                className="mb-6 px-6 py-3 bg-purple-600 text-primary-foreground rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors font-medium"
               >
                 {isCreatingInteraction ? 'Creating...' : 'Create Interaction Features'}
               </button>
@@ -584,7 +558,6 @@ export default function FeatureEngineeringPage() {
               </p>
             )}
 
-            {/* Display Created Interaction Features */}
             {interactionFeatures && (
               <div className="space-y-4">
                 {interactionFeatures.interactionFeatures.map((feature) => (

@@ -2,6 +2,8 @@
 Training Celery Tasks
 """
 
+
+
 import logging
 import time
 from uuid import UUID

@@ -1,11 +1,6 @@
-/**
- * Data Quality Dashboard Page
- * Protected route - requires authentication
- */
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { api } from '@/lib/api';
@@ -16,7 +11,6 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
   Cell,
 } from 'recharts';
@@ -49,13 +43,7 @@ export default function DataQualityPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!authLoading && token && datasetId) {
-      fetchQualityReport();
-    }
-  }, [authLoading, token, datasetId]);
-
-  const fetchQualityReport = async () => {
+  const fetchQualityReport = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -70,13 +58,20 @@ export default function DataQualityPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [datasetId, token]);
+
+  useEffect(() => {
+    if (!authLoading && token && datasetId) {
+      queueMicrotask(() => {
+        void fetchQualityReport();
+      });
+    }
+  }, [authLoading, token, datasetId, fetchQualityReport]);
 
   const handleBackToDashboard = () => {
     router.push('/dashboard');
   };
 
-  // Get quality score color based on value (Requirement 18.5)
   const getQualityScoreColor = (score: number): string => {
     if (score > 80) return 'text-green-600 dark:text-green-400';
     if (score >= 70) return 'text-yellow-600 dark:text-yellow-400';
@@ -89,7 +84,6 @@ export default function DataQualityPage() {
     return 'bg-red-100 dark:bg-red-900/20';
   };
 
-  // Prepare data for issue counts chart
   const getIssueCounts = () => {
     if (!qualityReport) return [];
 
@@ -115,31 +109,31 @@ export default function DataQualityPage() {
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground">Loading...</div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <nav className="bg-white dark:bg-gray-800 shadow">
+      <div className="min-h-screen bg-gray-50 dark:bg-background">
+        <nav className="bg-white dark:bg-card shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                   Data Quality Report
                 </h1>
               </div>
               <div className="flex items-center">
                 <button
                   onClick={handleBackToDashboard}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
                 >
                   Back to Dashboard
                 </button>
@@ -169,12 +163,12 @@ export default function DataQualityPage() {
   const issueCounts = getIssueCounts();
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Data Quality Report
               </h1>
             </div>
@@ -184,7 +178,7 @@ export default function DataQualityPage() {
               </span>
               <button
                 onClick={handleBackToDashboard}
-                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
               >
                 Back to Dashboard
               </button>
@@ -195,7 +189,6 @@ export default function DataQualityPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0 space-y-6">
-          {/* Warning Banner (Requirement 18.6) */}
           {qualityReport.quality_score < 70 && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <div className="flex">
@@ -228,9 +221,8 @@ export default function DataQualityPage() {
             </div>
           )}
 
-          {/* Quality Score Card (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-6">
               Overall Quality Score
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -277,9 +269,8 @@ export default function DataQualityPage() {
             </div>
           </div>
 
-          {/* Issue Counts Chart (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
               Issues by Category
             </h2>
             <ResponsiveContainer width="100%" height={300}>
@@ -304,14 +295,13 @@ export default function DataQualityPage() {
             </ResponsiveContainer>
           </div>
 
-          {/* Missing Values Breakdown (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
               Missing Values by Column
             </h2>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-border">
+                <thead className="bg-gray-50 dark:bg-muted">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Column
@@ -324,13 +314,13 @@ export default function DataQualityPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
                   {Object.entries(qualityReport.missing_values)
-                    .filter(([_, count]) => count > 0)
-                    .sort(([_, a], [__, b]) => b - a)
+                    .filter(([, count]) => count > 0)
+                    .sort(([, a], [, b]) => b - a)
                     .map(([column, count]) => (
                       <tr key={column}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-foreground">
                           {column}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -356,14 +346,13 @@ export default function DataQualityPage() {
             </div>
           </div>
 
-          {/* Outliers Breakdown (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
               Outliers by Column (IQR Method)
             </h2>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-border">
+                <thead className="bg-gray-50 dark:bg-muted">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Column
@@ -376,13 +365,13 @@ export default function DataQualityPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
                   {Object.entries(qualityReport.outliers)
-                    .filter(([_, info]) => info.count > 0)
-                    .sort(([_, a], [__, b]) => b.count - a.count)
+                    .filter(([, info]) => info.count > 0)
+                    .sort(([, a], [, b]) => b.count - a.count)
                     .map(([column, info]) => (
                       <tr key={column}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-foreground">
                           {column}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -408,14 +397,13 @@ export default function DataQualityPage() {
             </div>
           </div>
 
-          {/* Invalid Categorical Values Breakdown (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
               Invalid Categorical Values
             </h2>
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-                <thead className="bg-gray-50 dark:bg-gray-700">
+              <table className="min-w-full divide-y divide-gray-200 dark:divide-border">
+                <thead className="bg-gray-50 dark:bg-muted">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
                       Column
@@ -428,13 +416,13 @@ export default function DataQualityPage() {
                     </th>
                   </tr>
                 </thead>
-                <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
                   {Object.entries(qualityReport.invalid_categorical)
-                    .filter(([_, info]) => info.count > 0)
-                    .sort(([_, a], [__, b]) => b.count - a.count)
+                    .filter(([, info]) => info.count > 0)
+                    .sort(([, a], [, b]) => b.count - a.count)
                     .map(([column, info]) => (
                       <tr key={column}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-foreground">
                           {column}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -464,14 +452,13 @@ export default function DataQualityPage() {
             </div>
           </div>
 
-          {/* Specific Validations (Requirement 18.5) */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
               Specific Validations
             </h2>
             <div className="space-y-4">
               <div className="border-l-4 border-blue-500 pl-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground mb-2">
                   TotalCharges Convertibility
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -482,7 +469,7 @@ export default function DataQualityPage() {
                 </p>
               </div>
               <div className="border-l-4 border-purple-500 pl-4">
-                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+                <h3 className="text-sm font-semibold text-gray-900 dark:text-foreground mb-2">
                   Negative Values
                 </h3>
                 <p className="text-sm text-gray-600 dark:text-gray-400">

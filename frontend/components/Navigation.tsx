@@ -1,12 +1,3 @@
-/**
- * Navigation Component
- * Provides accessible, responsive navigation with:
- * - Keyboard navigation support
- * - ARIA labels and landmarks
- * - Mobile-responsive design
- * - Focus management
- */
-
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
@@ -42,12 +33,10 @@ export function Navigation() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
-  // Filter nav items based on user role
   const visibleNavItems = navItems.filter(
     (item) => !item.roles || (user?.role && item.roles.includes(user.role))
   );
 
-  // Handle mobile menu toggle
   const toggleMobileMenu = () => {
     const newState = !isMobileMenuOpen;
     setIsMobileMenuOpen(newState);
@@ -57,7 +46,6 @@ export function Navigation() {
     );
   };
 
-  // Trap focus in mobile menu when open
   useEffect(() => {
     if (isMobileMenuOpen && mobileMenuRef.current) {
       const cleanup = trapFocus(mobileMenuRef.current);
@@ -65,7 +53,6 @@ export function Navigation() {
     }
   }, [isMobileMenuOpen]);
 
-  // Close mobile menu on escape key
   useEffect(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && isMobileMenuOpen) {
@@ -78,9 +65,10 @@ export function Navigation() {
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isMobileMenuOpen]);
 
-  // Close mobile menu when route changes
   useEffect(() => {
-    setIsMobileMenuOpen(false);
+    queueMicrotask(() => {
+      setIsMobileMenuOpen(false);
+    });
   }, [pathname]);
 
   const handleLogout = async () => {
@@ -102,25 +90,23 @@ export function Navigation() {
 
   return (
     <nav
-      className="bg-white dark:bg-gray-800 shadow-md"
+      className="bg-white dark:bg-card shadow-md"
       role="navigation"
       aria-label="Main navigation"
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
-          {/* Logo and brand */}
           <div className="flex items-center">
             <Link
               href="/dashboard"
               className="flex items-center space-x-2 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
             >
-              <span className="text-xl font-bold text-gray-900 dark:text-white">
+              <span className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Churn Prediction
               </span>
             </Link>
           </div>
 
-          {/* Desktop navigation */}
           <div className="hidden md:flex md:items-center md:space-x-4">
             {visibleNavItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
@@ -140,8 +126,7 @@ export function Navigation() {
               );
             })}
 
-            {/* User menu */}
-            <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-gray-200 dark:border-gray-700">
+            <div className="flex items-center space-x-4 ml-4 pl-4 border-l border-gray-200 dark:border-border">
               <ThemeToggle />
               <span className="text-sm text-gray-700 dark:text-gray-300">
                 {user.email}
@@ -156,7 +141,6 @@ export function Navigation() {
             </div>
           </div>
 
-          {/* Mobile menu button */}
           <div className="flex items-center md:hidden">
             <button
               onClick={toggleMobileMenu}
@@ -204,12 +188,11 @@ export function Navigation() {
         </div>
       </div>
 
-      {/* Mobile menu */}
       {isMobileMenuOpen && (
         <div
           ref={mobileMenuRef}
           id="mobile-menu"
-          className="md:hidden border-t border-gray-200 dark:border-gray-700"
+          className="md:hidden border-t border-gray-200 dark:border-border"
         >
           <div className="px-2 pt-2 pb-3 space-y-1">
             {visibleNavItems.map((item) => {
@@ -231,11 +214,10 @@ export function Navigation() {
             })}
           </div>
 
-          {/* Mobile user menu */}
-          <div className="pt-4 pb-3 border-t border-gray-200 dark:border-gray-700">
+          <div className="pt-4 pb-3 border-t border-gray-200 dark:border-border">
             <div className="px-4 mb-3 flex items-center justify-between">
               <div>
-                <div className="text-sm font-medium text-gray-900 dark:text-white">
+                <div className="text-sm font-medium text-gray-900 dark:text-foreground">
                   {user.email}
                 </div>
                 <div className="text-xs text-gray-500 dark:text-gray-400">

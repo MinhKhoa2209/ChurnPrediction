@@ -2,6 +2,8 @@
 Dashboard Service
 """
 
+
+
 import json
 import logging
 from datetime import datetime, timedelta
@@ -13,6 +15,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.domain.models.customer_record import CustomerRecord
+from backend.domain.models.dataset import Dataset
 from backend.domain.models.prediction import Prediction
 
 logger = logging.getLogger(__name__)
@@ -76,7 +79,7 @@ class DashboardService:
             # Build base query
             query = db.query(CustomerRecord)
             if user_id:
-                query = query.filter(CustomerRecord.user_id == user_id)
+                query = query.join(Dataset).filter(Dataset.user_id == user_id)
             
             # Total customer count
             total_customers = query.count()
@@ -146,7 +149,7 @@ class DashboardService:
         try:
             query = db.query(CustomerRecord)
             if user_id:
-                query = query.filter(CustomerRecord.user_id == user_id)
+                query = query.join(Dataset).filter(Dataset.user_id == user_id)
             
             churned_count = query.filter(CustomerRecord.churn == True).count()
             total_count = query.count()
@@ -195,17 +198,6 @@ class DashboardService:
             end_date = datetime.utcnow()
             start_date = end_date - timedelta(days=months * 30)
             
-            # Query customer records with created_at in range
-            query = db.query(CustomerRecord)
-            if user_id:
-                query = query.filter(CustomerRecord.user_id == user_id)
-            
-            # Filter by date range
-            query = query.filter(
-                CustomerRecord.created_at >= start_date,
-                CustomerRecord.created_at <= end_date
-            )
-            
             # Group by month and churn status
             # Extract year-month from created_at
             results = db.query(
@@ -218,7 +210,7 @@ class DashboardService:
             )
             
             if user_id:
-                results = results.filter(CustomerRecord.user_id == user_id)
+                results = results.join(Dataset).filter(Dataset.user_id == user_id)
             
             results = results.group_by(
                 func.date_trunc('month', CustomerRecord.created_at)

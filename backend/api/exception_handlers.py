@@ -1,6 +1,7 @@
 """
 Global Exception Handlers for FastAPI
 Centralized error handling for the Customer Churn Prediction Platform
+"""
 
 import logging
 from typing import Union

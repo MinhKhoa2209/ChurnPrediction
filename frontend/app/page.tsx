@@ -1,9 +1,5 @@
 'use client';
 
-/**
- * Home Page
- * Redirects to dashboard if authenticated, otherwise to login
-
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -23,8 +19,8 @@ export default function Home() {
   }, [isAuthenticated, isLoading, router]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-      <div className="text-gray-900 dark:text-white">Loading...</div>
+    <div className="min-h-screen flex items-center justify-center bg-background">
+      <div className="text-foreground">Loading...</div>
     </div>
   );
 }

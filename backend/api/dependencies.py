@@ -68,7 +68,16 @@ def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    return UserResponse.model_validate(user)
+    # Create UserResponse with explicit string conversion for UUID
+    # This ensures the validator is called and UUID is properly converted
+    return UserResponse.model_validate({
+        'id': str(user.id),
+        'email': user.email,
+        'role': user.role,
+        'created_at': user.created_at,
+        'email_verified': user.email_verified,
+        'email_notifications_enabled': user.email_notifications_enabled
+    })
 
 
 def require_role(allowed_roles: List[str]):

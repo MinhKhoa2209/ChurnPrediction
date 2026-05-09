@@ -1,10 +1,3 @@
-/**
- * Error Handling Example Component
- * Demonstrates how to use the error handling system
- * This is an example component showing different error handling patterns.
- * It should not be used in production - it's for reference only.
- */
-
 'use client';
 
 import { useState } from 'react';
@@ -24,8 +17,7 @@ export function ErrorHandlingExample() {
   const [user] = useState<User | null>(null);
   const [token] = useState<string | null>(null);
 
-  // Example 1: Using useApi hook
-  const { data, loading, error, execute } = useApi<any>({
+  const { data, loading, error, execute } = useApi<unknown>({
     userId: user?.id,
     userEmail: user?.email,
     userRole: user?.role,
@@ -35,7 +27,7 @@ export function ErrorHandlingExample() {
     await execute(
       () => api.get('/datasets', token || undefined),
       {
-        onSuccess: (data) => {
+        onSuccess: (data: unknown) => {
           showSuccessToast('Data loaded successfully');
           console.log('Data:', data);
         },
@@ -45,7 +37,6 @@ export function ErrorHandlingExample() {
     );
   };
 
-  // Example 2: Using useApiError hook
   const { handleError } = useApiError({
     userId: user?.id,
     userEmail: user?.email,
@@ -65,7 +56,6 @@ export function ErrorHandlingExample() {
     }
   };
 
-  // Example 3: Using withErrorHandling
   const handleWithErrorHandlingExample = async () => {
     const result = await withErrorHandling(
       () => api.get('/datasets', token || undefined),
@@ -86,12 +76,11 @@ export function ErrorHandlingExample() {
     }
   };
 
-  // Example 4: Using withRetry
   const handleWithRetryExample = async () => {
     const result = await withRetry(
       () => api.get('/datasets', token || undefined),
-      3, // max retries
-      1000, // base delay in ms
+      3,
+      1000,
       {
         showToast: true,
         reportToSentry: true,
@@ -109,14 +98,12 @@ export function ErrorHandlingExample() {
     }
   };
 
-  // Example 5: Manual error handling
   const handleManualExample = async () => {
     try {
       const result = await api.get('/datasets', token || undefined);
       showSuccessToast('Data loaded successfully');
       console.log('Result:', result);
     } catch (error) {
-      // Manual error handling without automatic toast/Sentry
       console.error('Error:', error);
       showErrorToast(error as Error);
     }
@@ -135,12 +122,14 @@ export function ErrorHandlingExample() {
           <button
             onClick={handleUseApiExample}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+            className="px-4 py-2 bg-blue-600 text-primary-foreground rounded hover:bg-blue-700 disabled:opacity-50"
           >
             {loading ? 'Loading...' : 'Fetch with useApi'}
           </button>
           {error && <p className="text-red-600 mt-2">Error occurred (check toast)</p>}
-          {data && <pre className="mt-2 text-xs bg-gray-100 p-2 rounded">{JSON.stringify(data, null, 2)}</pre>}
+          {typeof data !== 'undefined' && data !== null ? (
+            <pre className="mt-2 text-xs bg-gray-100 p-2 rounded">{JSON.stringify(data as any, null, 2)}</pre>
+          ) : null}
         </div>
 
         <div className="border rounded-lg p-4">
@@ -150,7 +139,7 @@ export function ErrorHandlingExample() {
           </p>
           <button
             onClick={handleUseApiErrorExample}
-            className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+            className="px-4 py-2 bg-green-600 text-primary-foreground rounded hover:bg-green-700"
           >
             Fetch with useApiError
           </button>
@@ -163,7 +152,7 @@ export function ErrorHandlingExample() {
           </p>
           <button
             onClick={handleWithErrorHandlingExample}
-            className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+            className="px-4 py-2 bg-purple-600 text-primary-foreground rounded hover:bg-purple-700"
           >
             Fetch with withErrorHandling
           </button>
@@ -176,7 +165,7 @@ export function ErrorHandlingExample() {
           </p>
           <button
             onClick={handleWithRetryExample}
-            className="px-4 py-2 bg-orange-600 text-white rounded hover:bg-orange-700"
+            className="px-4 py-2 bg-orange-600 text-primary-foreground rounded hover:bg-orange-700"
           >
             Fetch with Retry
           </button>
@@ -189,7 +178,7 @@ export function ErrorHandlingExample() {
           </p>
           <button
             onClick={handleManualExample}
-            className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700"
+            className="px-4 py-2 bg-gray-600 text-primary-foreground rounded hover:bg-gray-700"
           >
             Fetch Manually
           </button>

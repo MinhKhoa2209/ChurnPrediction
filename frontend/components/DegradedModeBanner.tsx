@@ -1,34 +1,12 @@
 "use client";
-
-/**
- * Degraded Mode Banner Component
- * 
- * Displays a warning banner when the backend is operating in degraded mode
- * or when the frontend cannot reach the backend.
- * 
-
 import { useEffect, useState } from "react";
 import { AlertTriangle, RefreshCw, X } from "lucide-react";
 
 interface DegradedModeBannerProps {
-  /**
-   * Whether the backend is in degraded mode (cache unavailable)
-   */
+
   degradedMode?: boolean;
-  
-  /**
-   * Whether the backend is completely unreachable
-   */
   backendUnreachable?: boolean;
-  
-  /**
-   * Callback when user dismisses the banner
-   */
   onDismiss?: () => void;
-  
-  /**
-   * Callback when user clicks retry/refresh
-   */
   onRetry?: () => void;
 }
 
@@ -41,12 +19,12 @@ export function DegradedModeBanner({
   const [dismissed, setDismissed] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
 
-  // Reset dismissed state when mode changes
-  useEffect(() => {
-    setDismissed(false);
-  }, [degradedMode, backendUnreachable]);
 
-  // Don't show banner if dismissed or no issues
+  useEffect(() => {
+    queueMicrotask(() => {
+      setDismissed(false);
+    });
+  }, [degradedMode, backendUnreachable]);
   if (dismissed || (!degradedMode && !backendUnreachable)) {
     return null;
   }
@@ -61,12 +39,10 @@ export function DegradedModeBanner({
     try {
       await onRetry?.();
     } finally {
-      // Keep spinner for at least 500ms for better UX
       setTimeout(() => setIsRetrying(false), 500);
     }
   };
 
-  // Determine banner content based on issue type
   const isUnreachable = backendUnreachable;
   const bgColor = isUnreachable ? "bg-red-50 dark:bg-red-950" : "bg-yellow-50 dark:bg-yellow-950";
   const borderColor = isUnreachable ? "border-red-200 dark:border-red-800" : "border-yellow-200 dark:border-yellow-800";
@@ -89,13 +65,11 @@ export function DegradedModeBanner({
     >
       <div className="mx-auto max-w-7xl">
         <div className="flex items-start gap-3">
-          {/* Icon */}
           <AlertTriangle
-            className={`${iconColor} mt-0.5 h-5 w-5 flex-shrink-0`}
+            className={`${iconColor} mt-0.5 h-5 w-5 shrink-0`}
             aria-hidden="true"
           />
 
-          {/* Content */}
           <div className="flex-1 min-w-0">
             <h3 className={`${textColor} text-sm font-semibold`}>
               {title}
@@ -105,14 +79,12 @@ export function DegradedModeBanner({
             </p>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {/* Retry button */}
+          <div className="flex items-center gap-2 shrink-0">
             {onRetry && (
               <button
                 onClick={handleRetry}
                 disabled={isRetrying}
-                className={`${textColor} inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-black/5 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed`}
+                className={`${textColor} inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors hover:bg-background/5 dark:hover:bg-white/10 disabled:opacity-50 disabled:cursor-not-allowed`}
                 aria-label="Retry connection"
               >
                 <RefreshCw
@@ -123,11 +95,10 @@ export function DegradedModeBanner({
               </button>
             )}
 
-            {/* Dismiss button */}
             {onDismiss && (
               <button
                 onClick={handleDismiss}
-                className={`${textColor} rounded-md p-1.5 transition-colors hover:bg-black/5 dark:hover:bg-white/10`}
+                className={`${textColor} rounded-md p-1.5 transition-colors hover:bg-background/5 dark:hover:bg-white/10`}
                 aria-label="Dismiss banner"
               >
                 <X className="h-4 w-4" aria-hidden="true" />
@@ -140,18 +111,12 @@ export function DegradedModeBanner({
   );
 }
 
-/**
- * Hook to detect degraded mode from API responses
- * 
- * Monitors API response headers for X-Degraded-Mode header
+
 export function useDegradedMode() {
   const [degradedMode, setDegradedMode] = useState(false);
   const [backendUnreachable, setBackendUnreachable] = useState(false);
   const [lastChecked, setLastChecked] = useState<Date | null>(null);
 
-  /**
-   * Check response headers for degraded mode indicator
-   */
   const checkResponse = (response: Response) => {
     const isDegraded = response.headers.get("X-Degraded-Mode") === "true";
     setDegradedMode(isDegraded);
@@ -159,18 +124,12 @@ export function useDegradedMode() {
     setLastChecked(new Date());
   };
 
-  /**
-   * Mark backend as unreachable (network error)
-   */
   const markUnreachable = () => {
     setBackendUnreachable(true);
     setDegradedMode(false);
     setLastChecked(new Date());
   };
 
-  /**
-   * Clear all error states
-   */
   const clearErrors = () => {
     setDegradedMode(false);
     setBackendUnreachable(false);

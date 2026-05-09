@@ -1,11 +1,13 @@
 """
 Authentication Schemas
 Pydantic models for authentication requests and responses
+"""
 
 from datetime import datetime
-from typing import Literal
+from typing import Literal, Any
+from uuid import UUID
 
-from pydantic import BaseModel, EmailStr, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator, ConfigDict
 
 
 class RegisterRequest(BaseModel):
@@ -56,6 +58,10 @@ class TokenResponse(BaseModel):
 class UserResponse(BaseModel):
     """Response schema for user information"""
     
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True
+    )
+    
     id: str = Field(..., description="User's unique identifier")
     email: str = Field(..., description="User's email address")
     role: str = Field(..., description="User's role")
@@ -63,8 +69,13 @@ class UserResponse(BaseModel):
     email_verified: bool = Field(..., description="Email verification status")
     email_notifications_enabled: bool = Field(..., description="Email notification preference")
     
-    class Config:
-        from_attributes = True
+    @field_validator('id', mode='before')
+    @classmethod
+    def convert_uuid_to_str(cls, v: Any) -> str:
+        """Convert UUID to string"""
+        if isinstance(v, UUID):
+            return str(v)
+        return v
 
 
 class AuthResponse(BaseModel):

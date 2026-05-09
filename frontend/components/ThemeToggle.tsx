@@ -1,20 +1,11 @@
-/**
- * Theme Toggle Component
- * Provides a button to toggle between light and dark themes with:
- * - Visual icons for each theme
- * - Accessible ARIA labels
- * - Smooth transitions
- */
-
 'use client';
 
-import { useTheme } from '@/lib/theme-provider';
+import { useTheme } from 'next-themes';
 
 export function ThemeToggle() {
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  const { setTheme, resolvedTheme } = useTheme();
 
   const toggleTheme = () => {
-    // Toggle between light and dark (skip system for simplicity)
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
   };
 
@@ -26,7 +17,6 @@ export function ThemeToggle() {
       title={`Switch to ${resolvedTheme === 'dark' ? 'light' : 'dark'} mode`}
     >
       {resolvedTheme === 'dark' ? (
-        // Sun icon for light mode
         <svg
           className="w-5 h-5 text-gray-700 dark:text-gray-300"
           fill="currentColor"
@@ -40,7 +30,6 @@ export function ThemeToggle() {
           />
         </svg>
       ) : (
-        // Moon icon for dark mode
         <svg
           className="w-5 h-5 text-gray-700 dark:text-gray-300"
           fill="currentColor"

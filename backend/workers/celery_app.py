@@ -2,6 +2,8 @@
 Celery Application Configuration
 """
 
+
+
 from celery import Celery
 
 from backend.config import settings

@@ -1,12 +1,8 @@
-/**
- * Notifications Page
- * Protected route - requires authentication
-
 'use client';
 
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   listNotifications,
   markAsRead,
@@ -23,13 +19,7 @@ export default function NotificationsPage() {
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
 
-  useEffect(() => {
-    if (token && user) {
-      loadNotifications();
-    }
-  }, [token, user, filter]);
-
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     if (!token) return;
     
     setLoading(true);
@@ -47,14 +37,21 @@ export default function NotificationsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [filter, token]);
+
+  useEffect(() => {
+    if (token && user) {
+      queueMicrotask(() => {
+        void loadNotifications();
+      });
+    }
+  }, [token, user, filter, loadNotifications]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     if (!token) return;
     
     try {
       await markAsRead(token, notificationId);
-      // Update local state
       setNotifications(notifications.map(n =>
         n.id === notificationId ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
       ));
@@ -69,7 +66,6 @@ export default function NotificationsPage() {
     
     try {
       await markAllAsRead(token);
-      // Reload notifications
       await loadNotifications();
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
@@ -122,35 +118,35 @@ export default function NotificationsPage() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground">Loading...</div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   const unreadCount = notifications.filter(n => !n.is_read).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
               <button
                 onClick={() => router.push('/dashboard')}
-                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white mr-4"
+                className="text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground mr-4"
               >
                 ← Back
               </button>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Notifications
               </h1>
               {unreadCount > 0 && (
-                <span className="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-600 text-white">
+                <span className="ml-2 px-2 py-1 text-xs font-semibold rounded-full bg-blue-600 text-primary-foreground">
                   {unreadCount}
                 </span>
               )}
@@ -161,15 +157,14 @@ export default function NotificationsPage() {
 
       <main className="max-w-4xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {/* Filter and Actions */}
           <div className="mb-6 flex justify-between items-center">
             <div className="flex space-x-2">
               <button
                 onClick={() => setFilter('all')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filter === 'all'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-600 text-primary-foreground'
+                    : 'bg-white dark:bg-card text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 All
@@ -178,8 +173,8 @@ export default function NotificationsPage() {
                 onClick={() => setFilter('unread')}
                 className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   filter === 'unread'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
+                    ? 'bg-blue-600 text-primary-foreground'
+                    : 'bg-white dark:bg-card text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}
               >
                 Unread ({unreadCount})
@@ -195,7 +190,6 @@ export default function NotificationsPage() {
             )}
           </div>
 
-          {/* Error State */}
           {error && (
             <div className="mb-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
               <p className="text-sm text-red-800 dark:text-red-200">{error}</p>
@@ -208,16 +202,14 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          {/* Loading State */}
           {loading && (
             <div className="flex items-center justify-center py-12">
               <div className="text-gray-600 dark:text-gray-400">Loading notifications...</div>
             </div>
           )}
 
-          {/* Empty State */}
           {!loading && notifications.length === 0 && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-12 text-center">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-12 text-center">
               <svg
                 className="mx-auto h-12 w-12 text-gray-400"
                 fill="none"
@@ -231,7 +223,7 @@ export default function NotificationsPage() {
                   d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
                 />
               </svg>
-              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-white">
+              <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-foreground">
                 No notifications
               </h3>
               <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
@@ -240,9 +232,8 @@ export default function NotificationsPage() {
             </div>
           )}
 
-          {/* Notifications List */}
           {!loading && notifications.length > 0 && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg divide-y divide-gray-200 dark:divide-gray-700">
+            <div className="bg-white dark:bg-card shadow rounded-lg divide-y divide-gray-200 dark:divide-border">
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
@@ -255,7 +246,7 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
-                          <p className="text-sm font-medium text-gray-900 dark:text-white">
+                          <p className="text-sm font-medium text-gray-900 dark:text-foreground">
                             {notification.title}
                           </p>
                           <p className="mt-1 text-sm text-gray-600 dark:text-gray-400">

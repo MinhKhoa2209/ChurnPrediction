@@ -252,8 +252,11 @@ services:
         NODE_VERSION: ${NODE_VERSION:-20}
     container_name: churn-frontend
     environment:
+      # Client-side API URL (used by browser)
       NEXT_PUBLIC_API_URL: http://localhost:8000
       NEXT_PUBLIC_WS_URL: ws://localhost:8000/api/v1/ws
+      # Server-side API URL (used by Next.js server for SSR/API routes)
+      API_URL: http://backend:8000
       NODE_ENV: development
     ports:
       - "${FRONTEND_PORT:-3000}:3000"

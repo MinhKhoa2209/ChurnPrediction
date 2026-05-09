@@ -2,6 +2,8 @@
 WebSocket API Routes
 """
 
+
+
 import asyncio
 import json
 import logging
@@ -122,7 +124,17 @@ async def get_current_user_from_token(token: str, db: Session) -> Optional[UserR
         if user is None:
             return None
         
-        return UserResponse.model_validate(user)
+        # Convert UUID to string before validation
+        user_dict = {
+            'id': str(user.id),
+            'email': user.email,
+            'role': user.role,
+            'created_at': user.created_at,
+            'email_verified': user.email_verified,
+            'email_notifications_enabled': user.email_notifications_enabled
+        }
+        
+        return UserResponse.model_validate(user_dict)
         
     except (JWTError, Exception) as e:
         logger.warning(f"WebSocket authentication failed: {e}")

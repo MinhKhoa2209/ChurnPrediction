@@ -1,7 +1,3 @@
-/**
- * Welcome Modal Component
- * Shows onboarding guide for new users on first visit
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -19,7 +15,6 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
   const router = useRouter();
 
   useEffect(() => {
-    // Check if user has seen the welcome modal before
     const hasSeenWelcome = localStorage.getItem(WELCOME_MODAL_KEY);
     if (!hasSeenWelcome) {
       setIsOpen(true);
@@ -27,7 +22,6 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
   }, []);
 
   const handleClose = () => {
-    // Mark welcome modal as shown
     localStorage.setItem(WELCOME_MODAL_KEY, 'true');
     setIsOpen(false);
     onClose?.();
@@ -35,13 +29,11 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
 
   const handleGetStarted = () => {
     handleClose();
-    // Navigate to data upload page
     router.push('/data/upload');
   };
 
   const handleViewGuide = () => {
     handleClose();
-    // Navigate to getting started guide
     router.push('/getting-started');
   };
 
@@ -119,17 +111,14 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
       aria-modal="true"
       aria-labelledby="welcome-modal-title"
     >
-      {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-background bg-opacity-50 transition-opacity"
         onClick={handleClose}
         aria-hidden="true"
       />
 
-      {/* Modal */}
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
-          {/* Close button */}
+        <div className="relative bg-white dark:bg-card rounded-lg shadow-xl max-w-2xl w-full p-6">
           <button
             onClick={handleClose}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
@@ -151,11 +140,10 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </svg>
           </button>
 
-          {/* Header */}
           <div className="text-center mb-8">
             <h2
               id="welcome-modal-title"
-              className="text-3xl font-bold text-gray-900 dark:text-white mb-2"
+              className="text-3xl font-bold text-gray-900 dark:text-foreground mb-2"
             >
               Welcome to Churn Prediction Platform
             </h2>
@@ -164,7 +152,6 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             </p>
           </div>
 
-          {/* Steps */}
           <div className="space-y-6 mb-8">
             {steps.map((step, index) => (
               <div
@@ -172,12 +159,11 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
                 className={`flex items-start space-x-4 p-4 rounded-lg transition-colors ${
                   currentStep === index
                     ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500'
-                    : 'bg-gray-50 dark:bg-gray-700/50'
+                    : 'bg-gray-50 dark:bg-muted/50'
                 }`}
               >
-                {/* Step number and icon */}
                 <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-gray-800 shadow-md">
+                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-card shadow-md">
                     {step.icon}
                   </div>
                   <div className="text-center mt-2">
@@ -187,9 +173,8 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
                   </div>
                 </div>
 
-                {/* Step content */}
                 <div className="flex-1 pt-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
                     {step.title}
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400">
@@ -200,7 +185,6 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             ))}
           </div>
 
-          {/* Step indicators */}
           <div className="flex justify-center space-x-2 mb-6">
             {steps.map((_, index) => (
               <button
@@ -209,7 +193,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
                 className={`w-3 h-3 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   currentStep === index
                     ? 'bg-blue-600'
-                    : 'bg-gray-300 dark:bg-gray-600'
+                    : 'bg-gray-300 dark:bg-muted'
                 }`}
                 aria-label={`Go to step ${index + 1}`}
                 aria-current={currentStep === index ? 'step' : undefined}
@@ -217,12 +201,11 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             ))}
           </div>
 
-          {/* Actions */}
           <div className="flex justify-between items-center">
             <div className="flex space-x-3">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
               >
                 Skip for now
               </button>
@@ -238,7 +221,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               {currentStep > 0 && (
                 <button
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-4 py-2 border border-gray-300 dark:border-border text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Previous
                 </button>
@@ -247,14 +230,14 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
               {currentStep < steps.length - 1 ? (
                 <button
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-6 py-2 bg-blue-600 text-primary-foreground rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Next
                 </button>
               ) : (
                 <button
                   onClick={handleGetStarted}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                  className="px-6 py-2 bg-blue-600 text-primary-foreground rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
                 >
                   Get Started
                 </button>

@@ -1,19 +1,12 @@
-/**
- * EDA (Exploratory Data Analysis) Page
- * Protected route - requires authentication
- */
-
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { api } from '@/lib/api';
 import {
   BarChart,
   Bar,
-  LineChart,
-  Line,
   ScatterChart,
   Scatter,
   XAxis,
@@ -22,10 +15,8 @@ import {
   Tooltip,
   Legend,
   ResponsiveContainer,
-  Cell,
 } from 'recharts';
 
-// Type definitions for API responses
 interface CorrelationData {
   datasetId: string;
   features: string[];
@@ -40,6 +31,11 @@ interface FeatureDistribution {
   max: number;
   mean: number;
   median: number;
+}
+
+interface HistogramBin {
+  bin: string;
+  frequency: number;
 }
 
 interface DistributionsData {
@@ -112,7 +108,6 @@ export default function EDAPage() {
   const datasetId = params.datasetId as string;
   const { user, token, isLoading: authLoading } = useAuthStore();
 
-  // State for all EDA data
   const [correlationData, setCorrelationData] = useState<CorrelationData | null>(null);
   const [distributionsData, setDistributionsData] = useState<DistributionsData | null>(null);
   const [churnByContractData, setChurnByContractData] = useState<ChurnByContractData | null>(null);
@@ -120,18 +115,11 @@ export default function EDAPage() {
   const [scatterData, setScatterData] = useState<ScatterPlotData | null>(null);
   const [pcaData, setPcaData] = useState<PCAData | null>(null);
 
-  // Loading and error states
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
-  useEffect(() => {
-    if (!authLoading && token && datasetId) {
-      fetchAllEDAData();
-    }
-  }, [authLoading, token, datasetId]);
-
-  const fetchAllEDAData = async () => {
+  const fetchAllEDAData = useCallback(async () => {
     try {
       setIsLoading(true);
       setError(null);
@@ -139,7 +127,6 @@ export default function EDAPage() {
 
       const startTime = Date.now();
 
-      // Fetch all EDA endpoints in parallel for performance (Requirement 5.6)
       const [correlation, distributions, churnContract, churnInternet, scatter, pca] = await Promise.all([
         api.get<CorrelationData>(`/eda/${datasetId}/correlation`, token!).then(data => {
           setLoadingProgress(prev => prev + 16.67);
@@ -172,7 +159,6 @@ export default function EDAPage() {
 
       console.log(`EDA data loaded in ${loadTime.toFixed(2)} seconds`);
 
-      // Set all data
       setCorrelationData(correlation);
       setDistributionsData(distributions);
       setChurnByContractData(churnContract);
@@ -186,32 +172,22 @@ export default function EDAPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [datasetId, token]);
+
+  useEffect(() => {
+    if (!authLoading && token && datasetId) {
+      queueMicrotask(() => {
+        void fetchAllEDAData();
+      });
+    }
+  }, [authLoading, token, datasetId, fetchAllEDAData]);
 
   const handleBackToDashboard = () => {
     router.push('/dashboard');
   };
 
-  // Prepare correlation heatmap data
-  const prepareHeatmapData = () => {
-    if (!correlationData) return [];
-    
-    const data: any[] = [];
-    correlationData.features.forEach((feature, i) => {
-      correlationData.features.forEach((otherFeature, j) => {
-        data.push({
-          x: feature,
-          y: otherFeature,
-          value: correlationData.correlationMatrix[i][j],
-        });
-      });
-    });
-    return data;
-  };
-
-  // Prepare histogram data for a feature
   const prepareHistogramData = (distribution: FeatureDistribution) => {
-    const data: any[] = [];
+    const data: HistogramBin[] = [];
     for (let i = 0; i < distribution.frequencies.length; i++) {
       const binStart = distribution.bins[i];
       const binEnd = distribution.bins[i + 1];
@@ -224,20 +200,19 @@ export default function EDAPage() {
     return data;
   };
 
-  // Get color for correlation value
   const getCorrelationColor = (value: number): string => {
-    if (value > 0.7) return '#10b981'; // Strong positive - green
-    if (value > 0.3) return '#84cc16'; // Moderate positive - lime
-    if (value > -0.3) return '#fbbf24'; // Weak - yellow
-    if (value > -0.7) return '#f97316'; // Moderate negative - orange
-    return '#ef4444'; // Strong negative - red
+    if (value > 0.7) return '#10b981';
+    if (value > 0.3) return '#84cc16';
+    if (value > -0.3) return '#fbbf24';
+    if (value > -0.7) return '#f97316';
+    return '#ef4444';
   };
 
   if (authLoading || isLoading) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white mb-4">Loading EDA visualizations...</div>
-        <div className="w-64 bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground mb-4">Loading EDA visualizations...</div>
+        <div className="w-64 bg-gray-200 dark:bg-muted rounded-full h-2.5">
           <div
             className="bg-blue-600 h-2.5 rounded-full transition-all duration-300"
             style={{ width: `${loadingProgress}%` }}
@@ -251,24 +226,24 @@ export default function EDAPage() {
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <nav className="bg-white dark:bg-gray-800 shadow">
+      <div className="min-h-screen bg-gray-50 dark:bg-background">
+        <nav className="bg-white dark:bg-card shadow">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between h-16">
               <div className="flex items-center">
-                <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+                <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                   Exploratory Data Analysis
                 </h1>
               </div>
               <div className="flex items-center">
                 <button
                   onClick={handleBackToDashboard}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
                 >
                   Back to Dashboard
                 </button>
@@ -292,12 +267,12 @@ export default function EDAPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Exploratory Data Analysis
               </h1>
             </div>
@@ -307,7 +282,7 @@ export default function EDAPage() {
               </span>
               <button
                 onClick={handleBackToDashboard}
-                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
+                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
               >
                 Back to Dashboard
               </button>
@@ -318,9 +293,8 @@ export default function EDAPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0 space-y-6">
-          {/* Dataset Info */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-2">
               Dataset Overview
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
@@ -331,10 +305,9 @@ export default function EDAPage() {
             </p>
           </div>
 
-          {/* Correlation Heatmap (Requirement 5.1) */}
           {correlationData && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
                 Correlation Heatmap
               </h2>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
@@ -344,11 +317,11 @@ export default function EDAPage() {
                 <table className="min-w-full border-collapse">
                   <thead>
                     <tr>
-                      <th className="border border-gray-300 dark:border-gray-600 p-2"></th>
+                      <th className="border border-gray-300 dark:border-border p-2"></th>
                       {correlationData.features.map((feature) => (
                         <th
                           key={feature}
-                          className="border border-gray-300 dark:border-gray-600 p-2 text-xs font-medium text-gray-700 dark:text-gray-300"
+                          className="border border-gray-300 dark:border-border p-2 text-xs font-medium text-gray-700 dark:text-gray-300"
                         >
                           {feature}
                         </th>
@@ -358,7 +331,7 @@ export default function EDAPage() {
                   <tbody>
                     {correlationData.features.map((feature, i) => (
                       <tr key={feature}>
-                        <td className="border border-gray-300 dark:border-gray-600 p-2 text-xs font-medium text-gray-700 dark:text-gray-300">
+                        <td className="border border-gray-300 dark:border-border p-2 text-xs font-medium text-gray-700 dark:text-gray-300">
                           {feature}
                         </td>
                         {correlationData.features.map((_, j) => {
@@ -367,7 +340,7 @@ export default function EDAPage() {
                           return (
                             <td
                               key={j}
-                              className="border border-gray-300 dark:border-gray-600 p-2 text-center text-xs"
+                              className="border border-gray-300 dark:border-border p-2 text-center text-xs"
                               style={{
                                 backgroundColor: color,
                                 color: Math.abs(value) > 0.5 ? '#ffffff' : '#000000',
@@ -385,16 +358,14 @@ export default function EDAPage() {
             </div>
           )}
 
-          {/* Distribution Histograms (Requirement 5.2) */}
           {distributionsData && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
                 Feature Distributions
               </h2>
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Tenure Distribution */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
                     Tenure (months)
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
@@ -418,9 +389,8 @@ export default function EDAPage() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* MonthlyCharges Distribution */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
                     Monthly Charges ($)
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
@@ -444,9 +414,8 @@ export default function EDAPage() {
                   </ResponsiveContainer>
                 </div>
 
-                {/* TotalCharges Distribution */}
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
                     Total Charges ($)
                   </h3>
                   <p className="text-xs text-gray-600 dark:text-gray-400 mb-2">
@@ -473,12 +442,10 @@ export default function EDAPage() {
             </div>
           )}
 
-          {/* Churn Rate Charts (Requirements 5.3, 5.4) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Churn by Contract Type */}
             {churnByContractData && (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
                   Churn Rate by Contract Type
                 </h2>
                 <ResponsiveContainer width="100%" height={300}>
@@ -492,7 +459,7 @@ export default function EDAPage() {
                         border: '1px solid #374151',
                         borderRadius: '0.5rem',
                       }}
-                      formatter={(value: any) => `${(value * 100).toFixed(2)}%`}
+                      formatter={(value) => `${(Number(value) * 100).toFixed(2)}%`}
                     />
                     <Bar dataKey="churnRate" fill="#ef4444" radius={[8, 8, 0, 0]} />
                   </BarChart>
@@ -500,10 +467,9 @@ export default function EDAPage() {
               </div>
             )}
 
-            {/* Churn by Internet Service */}
             {churnByInternetData && (
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
                   Churn Rate by Internet Service
                 </h2>
                 <ResponsiveContainer width="100%" height={300}>
@@ -517,7 +483,7 @@ export default function EDAPage() {
                         border: '1px solid #374151',
                         borderRadius: '0.5rem',
                       }}
-                      formatter={(value: any) => `${(value * 100).toFixed(2)}%`}
+                      formatter={(value) => `${(Number(value) * 100).toFixed(2)}%`}
                     />
                     <Bar dataKey="churnRate" fill="#f59e0b" radius={[8, 8, 0, 0]} />
                   </BarChart>
@@ -526,10 +492,9 @@ export default function EDAPage() {
             )}
           </div>
 
-          {/* Scatter Plot (Requirement 5.5) */}
           {scatterData && (
-            <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
                 Monthly Charges vs Total Charges (Colored by Churn)
               </h2>
               <ResponsiveContainer width="100%" height={400}>
@@ -575,12 +540,10 @@ export default function EDAPage() {
             </div>
           )}
 
-          {/* PCA Visualizations (Requirements 7.1, 7.2, 7.5) */}
           {pcaData && (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* 2D PCA */}
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-2">
                   2D PCA Visualization
                 </h2>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
@@ -628,9 +591,8 @@ export default function EDAPage() {
                 </ResponsiveContainer>
               </div>
 
-              {/* 3D PCA (displayed as 2D projection) */}
-              <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-2">
                   3D PCA Visualization (PC1 vs PC3)
                 </h2>
                 <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">

@@ -1,17 +1,8 @@
-/**
- * Screen Reader Announcer Component
- * Requirement 28.6: Screen reader announcements for dynamic content updates
- * 
- * Provides a centralized system for announcing dynamic content changes
- * to screen readers using ARIA live regions.
- */
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 
-// Announcement types
 export type AnnouncementPriority = 'polite' | 'assertive' | 'off';
 
 export interface Announcement {
@@ -21,7 +12,6 @@ export interface Announcement {
   timestamp: number;
 }
 
-// Zustand store for managing announcements
 interface AnnouncementStore {
   announcements: Announcement[];
   addAnnouncement: (message: string, priority?: AnnouncementPriority) => void;
@@ -42,7 +32,6 @@ export const useAnnouncementStore = create<AnnouncementStore>((set) => ({
       announcements: [...state.announcements, announcement],
     }));
 
-    // Auto-clear after 5 seconds
     setTimeout(() => {
       set((state) => ({
         announcements: state.announcements.filter((a) => a.id !== announcement.id),
@@ -52,31 +41,18 @@ export const useAnnouncementStore = create<AnnouncementStore>((set) => ({
   clearAnnouncements: () => set({ announcements: [] }),
 }));
 
-/**
- * Screen Reader Announcer Component
- * Should be placed once at the root level of the application
- */
 export function ScreenReaderAnnouncer() {
   const announcements = useAnnouncementStore((state) => state.announcements);
-  const [politeMessages, setPoliteMessages] = useState<string[]>([]);
-  const [assertiveMessages, setAssertiveMessages] = useState<string[]>([]);
+  const politeMessages = announcements
+    .filter((a) => a.priority === 'polite')
+    .map((a) => a.message);
 
-  useEffect(() => {
-    const polite = announcements
-      .filter((a) => a.priority === 'polite')
-      .map((a) => a.message);
-    
-    const assertive = announcements
-      .filter((a) => a.priority === 'assertive')
-      .map((a) => a.message);
-
-    setPoliteMessages(polite);
-    setAssertiveMessages(assertive);
-  }, [announcements]);
+  const assertiveMessages = announcements
+    .filter((a) => a.priority === 'assertive')
+    .map((a) => a.message);
 
   return (
     <>
-      {/* Polite announcements - don't interrupt current speech */}
       <div
         role="status"
         aria-live="polite"
@@ -88,7 +64,6 @@ export function ScreenReaderAnnouncer() {
         ))}
       </div>
 
-      {/* Assertive announcements - interrupt current speech */}
       <div
         role="alert"
         aria-live="assertive"
@@ -103,21 +78,11 @@ export function ScreenReaderAnnouncer() {
   );
 }
 
-/**
- * Hook for announcing messages to screen readers
- * Usage:
- * const announce = useScreenReaderAnnounce();
- * announce('Data loaded successfully', 'polite');
- */
 export function useScreenReaderAnnounce() {
   const addAnnouncement = useAnnouncementStore((state) => state.addAnnouncement);
   return addAnnouncement;
 }
 
-/**
- * Component for announcing route changes
- * Requirement 28.6: Announce page navigation to screen readers
- */
 export function RouteAnnouncer({ pageName }: { pageName: string }) {
   const announce = useScreenReaderAnnounce();
 
@@ -128,10 +93,6 @@ export function RouteAnnouncer({ pageName }: { pageName: string }) {
   return null;
 }
 
-/**
- * Component for announcing loading states
- * Requirement 28.6: Announce async operations to screen readers
- */
 interface LoadingAnnouncerProps {
   isLoading: boolean;
   loadingMessage?: string;
@@ -151,12 +112,10 @@ export function LoadingAnnouncer({
   const [previousLoadingState, setPreviousLoadingState] = useState(isLoading);
 
   useEffect(() => {
-    // Announce when loading starts
     if (isLoading && !previousLoadingState) {
       announce(loadingMessage, 'polite');
     }
 
-    // Announce when loading completes
     if (!isLoading && previousLoadingState) {
       if (error) {
         const message = error.message || errorMessage;
@@ -172,10 +131,6 @@ export function LoadingAnnouncer({
   return null;
 }
 
-/**
- * Component for announcing form validation errors
- * Requirement 28.6: Announce validation errors to screen readers
- */
 interface ValidationAnnouncerProps {
   errors: Record<string, string>;
 }
@@ -188,14 +143,12 @@ export function ValidationAnnouncer({ errors }: ValidationAnnouncerProps) {
     const errorKeys = Object.keys(errors);
     const previousErrorKeys = Object.keys(previousErrors);
 
-    // Announce new errors
     const newErrors = errorKeys.filter((key) => !previousErrorKeys.includes(key));
     if (newErrors.length > 0) {
       const errorMessages = newErrors.map((key) => `${key}: ${errors[key]}`).join('. ');
       announce(`Form validation errors: ${errorMessages}`, 'assertive');
     }
 
-    // Announce cleared errors
     const clearedErrors = previousErrorKeys.filter((key) => !errorKeys.includes(key));
     if (clearedErrors.length > 0 && errorKeys.length === 0) {
       announce('All form errors have been resolved', 'polite');
@@ -207,14 +160,10 @@ export function ValidationAnnouncer({ errors }: ValidationAnnouncerProps) {
   return null;
 }
 
-/**
- * Component for announcing data updates
- * Requirement 28.6: Announce dynamic data changes to screen readers
- */
 interface DataUpdateAnnouncerProps {
-  data: any;
+  data: unknown;
   dataName: string;
-  formatMessage?: (data: any) => string;
+  formatMessage?: (data: unknown) => string;
 }
 
 export function DataUpdateAnnouncer({
@@ -239,10 +188,6 @@ export function DataUpdateAnnouncer({
   return null;
 }
 
-/**
- * Component for announcing notifications
- * Requirement 28.6: Announce in-app notifications to screen readers
- */
 interface NotificationAnnouncerProps {
   notification: {
     title: string;

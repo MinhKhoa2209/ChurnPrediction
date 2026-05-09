@@ -1,6 +1,7 @@
 """
 Redis Cache Infrastructure with Graceful Degradation
 Provides caching functionality with fallback to database when cache is unavailable
+"""
 
 import logging
 import json

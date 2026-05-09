@@ -1,6 +1,7 @@
 """
 Database Infrastructure
 Provides database connection and session management
+"""
 
 import logging
 import time
@@ -85,16 +86,15 @@ def retry_on_db_error(max_retries: int = 3, base_delay: float = 1.0) -> Callable
     return decorator
 
 
-@retry_on_db_error(max_retries=3, base_delay=1.0)
 def get_db():
     """
-    Dependency function to get database session with retry logic
+    Dependency function to get database session
     Yields a database session and ensures it's closed after use
     
     - 30.2: Return 503 Service Unavailable when database is down
     
     Raises:
-        OperationalError: If database connection fails after 3 retries
+        OperationalError: If database connection fails
     """
     db = SessionLocal()
     try:

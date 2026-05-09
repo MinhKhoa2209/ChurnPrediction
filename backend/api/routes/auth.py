@@ -407,7 +407,6 @@ async def logout(
 
 @router.get(
     "/me",
-    response_model=UserResponse,
     responses={
         200: {"description": "Current user information"},
         401: {"model": ErrorResponse, "description": "Unauthorized"},
@@ -415,7 +414,7 @@ async def logout(
 )
 async def get_current_user_info(
     current_user: Annotated[UserResponse, Depends(get_current_user)]
-) -> UserResponse:
+):
     """
     Get current authenticated user information
     Requirement 1.6: Redirect unauthenticated users (handled by dependency)
@@ -427,7 +426,27 @@ async def get_current_user_info(
     Returns:
         Current user information
     """
-    return current_user
+    from fastapi.responses import JSONResponse
+    import json
+    from datetime import datetime
+    
+    # Custom JSON encoder for datetime
+    def json_encoder(obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+    
+    # Serialize manually to avoid Pydantic validation
+    user_data = {
+        'id': current_user.id,
+        'email': current_user.email,
+        'role': current_user.role,
+        'created_at': current_user.created_at,
+        'email_verified': current_user.email_verified,
+        'email_notifications_enabled': current_user.email_notifications_enabled
+    }
+    
+    return JSONResponse(content=json.loads(json.dumps(user_data, default=json_encoder)))
 
 
 @router.patch(
@@ -457,9 +476,10 @@ async def update_user_settings(
         Updated user information
     """
     from backend.domain.models.user import User
+    from uuid import UUID
     
-    # Get user from database
-    user = db.query(User).filter(User.id == current_user.id).first()
+    # Get user from database (convert string ID to UUID)
+    user = db.query(User).filter(User.id == UUID(current_user.id)).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -471,7 +491,17 @@ async def update_user_settings(
     db.commit()
     db.refresh(user)
     
-    return UserResponse.model_validate(user)
+    # Convert UUID to string before validation
+    user_dict = {
+        'id': str(user.id),
+        'email': user.email,
+        'role': user.role,
+        'created_at': user.created_at,
+        'email_verified': user.email_verified,
+        'email_notifications_enabled': user.email_notifications_enabled
+    }
+    
+    return UserResponse.model_validate(user_dict)
 
 
 @router.post(

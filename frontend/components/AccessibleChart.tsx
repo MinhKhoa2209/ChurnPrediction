@@ -1,12 +1,3 @@
-/**
- * Accessible Chart Wrapper Component
- * 
- * Wraps chart components with accessibility features including:
- * - Descriptive ARIA labels
- * - Text alternatives for screen readers
- * - Keyboard navigation support
- */
-
 'use client';
 
 import { ReactNode } from 'react';
@@ -35,7 +26,6 @@ export function AccessibleChart({
   summary,
   className = '',
 }: AccessibleChartProps) {
-  // Generate accessible description
   const generateAccessibleDescription = (): string => {
     let desc = `${title}. ${description}. This is a ${chartType} chart. `;
 
@@ -46,7 +36,7 @@ export function AccessibleChart({
     if (data.length > 0) {
       desc += `The chart contains ${data.length} data points: `;
       const pointDescriptions = data
-        .slice(0, 10) // Limit to first 10 for brevity
+        .slice(0, 10)
         .map((point) => `${point.label}: ${point.value}`);
       desc += pointDescriptions.join(', ');
 
@@ -66,29 +56,25 @@ export function AccessibleChart({
       role="img"
       aria-label={accessibleDescription}
     >
-      {/* Visual chart for sighted users */}
       <div aria-hidden="true">{children}</div>
 
-      {/* Screen reader only description */}
       <figcaption className="sr-only">{accessibleDescription}</figcaption>
 
-      {/* Optional visible summary */}
       {summary && (
         <div className="mt-2 text-sm text-gray-600 dark:text-gray-400">
           <p>{summary}</p>
         </div>
       )}
 
-      {/* Data table alternative for screen readers */}
       {data.length > 0 && (
         <details className="mt-4">
           <summary className="cursor-pointer text-sm text-blue-600 dark:text-blue-400 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-500 rounded">
             View data table
           </summary>
           <div className="mt-2 overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+            <table className="min-w-full divide-y divide-gray-200 dark:divide-border">
               <caption className="sr-only">{title} data table</caption>
-              <thead className="bg-gray-50 dark:bg-gray-800">
+              <thead className="bg-gray-50 dark:bg-card">
                 <tr>
                   <th
                     scope="col"
@@ -104,7 +90,7 @@ export function AccessibleChart({
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+              <tbody className="bg-white dark:bg-background divide-y divide-gray-200 dark:divide-border">
                 {data.map((point, index) => (
                   <tr key={index}>
                     <td className="px-4 py-2 text-sm text-gray-900 dark:text-gray-100">
@@ -124,10 +110,6 @@ export function AccessibleChart({
   );
 }
 
-/**
- * Accessible Chart Legend Component
- * Provides keyboard-navigable legend for charts
- */
 interface LegendItem {
   label: string;
   color: string;

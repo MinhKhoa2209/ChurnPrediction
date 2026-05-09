@@ -291,6 +291,7 @@ class UserContextMiddleware(BaseHTTPMiddleware):
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """
     Middleware to log all API requests with method, path, status code, and response time
+    """
     
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         """

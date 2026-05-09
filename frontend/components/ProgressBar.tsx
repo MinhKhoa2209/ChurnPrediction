@@ -1,8 +1,3 @@
-/**
- * Progress Bar Component
- * Displays progress for long-running operations
- */
-
 export function ProgressBar({
   progress,
   label,
@@ -37,7 +32,7 @@ export function ProgressBar({
           )}
         </div>
       )}
-      <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div className="w-full bg-gray-200 dark:bg-muted rounded-full h-2.5">
         <div
           className={`${colorClasses[color]} h-2.5 rounded-full transition-all duration-300`}
           style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}

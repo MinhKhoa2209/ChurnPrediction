@@ -1,14 +1,3 @@
-/**
- * Churn Prediction Page
- * Provides a comprehensive interface for predicting customer churn:
- * - Form accepting all customer feature inputs (Req 12.1)
- * - Field validation (Req 12.2, 12.3)
- * - Prediction generation (Req 12.4, 12.5, 12.6)
- * - Probability display with color coding (Req 12.7)
- * - SHAP waterfall chart showing feature contributions (Req 12.8)
- * - Threshold slider for Data_Scientist role (Req 12.9, 12.10)
- */
-
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -36,7 +25,6 @@ export default function PredictionsPage() {
   const [isPredicting, setIsPredicting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Load available model versions on mount
   useEffect(() => {
     if (!token) return;
 
@@ -47,7 +35,6 @@ export default function PredictionsPage() {
         const response = await listModelVersions(token, { status: 'active' });
         setModelVersions(response.versions);
         
-        // Auto-select the first active model if available
         if (response.versions.length > 0) {
           setSelectedModelId(response.versions[0].id);
         }
@@ -73,7 +60,6 @@ export default function PredictionsPage() {
       setError(null);
       setFormData(input);
 
-      // Create prediction (Requirement 12.5, 12.6)
       const result = await createSinglePrediction(
         {
           model_version_id: selectedModelId,
@@ -104,20 +90,19 @@ export default function PredictionsPage() {
 
   if (authLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
-        <div className="text-gray-900 dark:text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <div className="text-gray-900 dark:text-foreground">Loading...</div>
       </div>
     );
   }
 
   if (!user) {
-    return null; // AuthProvider will handle redirect
+    return null;
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      {/* Navigation */}
-      <nav className="bg-white dark:bg-gray-800 shadow">
+    <div className="min-h-screen bg-gray-50 dark:bg-background">
+      <nav className="bg-white dark:bg-card shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
@@ -127,7 +112,7 @@ export default function PredictionsPage() {
               >
                 ← Back
               </button>
-              <h1 className="text-xl font-bold text-gray-900 dark:text-white">
+              <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Customer Churn Prediction
               </h1>
             </div>
@@ -148,9 +133,8 @@ export default function PredictionsPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0">
-          {/* Model Selection */}
-          <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 mb-6">
-            <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">
+          <div className="bg-white dark:bg-card shadow rounded-lg p-6 mb-6">
+            <h2 className="text-lg font-bold text-gray-900 dark:text-foreground mb-4">
               Select Model Version
             </h2>
             
@@ -190,7 +174,7 @@ export default function PredictionsPage() {
                 <select
                   value={selectedModelId}
                   onChange={(e) => setSelectedModelId(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 dark:border-border rounded-lg bg-white dark:bg-muted text-gray-900 dark:text-foreground focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {modelVersions.map((model) => (
                     <option key={model.id} value={model.id}>
@@ -214,7 +198,6 @@ export default function PredictionsPage() {
             )}
           </div>
 
-          {/* Error Display */}
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
               <div className="flex items-center">
@@ -239,9 +222,7 @@ export default function PredictionsPage() {
             </div>
           )}
 
-          {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Left Column: Prediction Form */}
             <div>
               <PredictionForm
                 onSubmit={handleFormSubmit}
@@ -250,7 +231,6 @@ export default function PredictionsPage() {
               />
             </div>
 
-            {/* Right Column: Prediction Result */}
             <div>
               {prediction ? (
                 <PredictionResult
@@ -259,7 +239,7 @@ export default function PredictionsPage() {
                   userRole={user.role}
                 />
               ) : (
-                <div className="bg-white dark:bg-gray-800 shadow rounded-lg p-6 h-full flex items-center justify-center">
+                <div className="bg-white dark:bg-card shadow rounded-lg p-6 h-full flex items-center justify-center">
                   <div className="text-center text-gray-500 dark:text-gray-400">
                     <svg
                       className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600"
@@ -284,9 +264,8 @@ export default function PredictionsPage() {
             </div>
           </div>
 
-          {/* Information Panel */}
-          <div className="mt-6 bg-white dark:bg-gray-800 shadow rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          <div className="mt-6 bg-white dark:bg-card shadow rounded-lg p-6">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-4">
               About Churn Prediction
             </h3>
             <div className="space-y-3 text-sm text-gray-700 dark:text-gray-300">
