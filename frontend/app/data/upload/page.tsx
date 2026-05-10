@@ -84,7 +84,7 @@ export default function DataUploadPage() {
     return null;
   }
 
-  const canUpload = user.role === 'Admin' || user.role === 'Data_Scientist';
+  const canUpload = user.role === 'Admin';
 
   if (!canUpload) {
     return (
@@ -116,7 +116,7 @@ export default function DataUploadPage() {
                 Access Denied
               </h2>
               <p className="text-sm text-red-700 dark:text-red-300">
-                You do not have permission to upload data. This feature requires Data_Scientist or Admin role.
+                You do not have permission to upload data. This feature requires the Admin role.
               </p>
             </div>
           </div>
@@ -255,7 +255,7 @@ export default function DataUploadPage() {
                         />
                       </svg>
                     </div>
-                    <div className="ml-3">
+                    <div className="ml-3 flex-1">
                       <h3 className="text-sm font-medium text-green-800 dark:text-green-200">
                         Upload Successful
                       </h3>
@@ -265,6 +265,14 @@ export default function DataUploadPage() {
                           Dataset ID: <span className="font-mono">{currentDataset.id}</span>
                         </p>
                         <p>Status: {currentDataset.status}</p>
+                      </div>
+                      <div className="mt-4">
+                        <button
+                          onClick={() => router.push(`/models/training?dataset=${currentDataset.id}`)}
+                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                        >
+                          Train Models
+                        </button>
                       </div>
                     </div>
                   </div>

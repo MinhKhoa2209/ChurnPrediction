@@ -1,15 +1,139 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { 
+  BookOpen,
+  CheckCircle,
+  ChevronRight,
+  ArrowLeft,
+  Brain,
+  Target,
+  BarChart3,
+  Upload,
+  LineChart,
+  FileText,
+  History,
+  Bell,
+  Users,
+  TrendingUp,
+} from 'lucide-react';
 
 export default function GettingStartedPage() {
   const router = useRouter();
+  const { user } = useAuthStore();
+  const userRole = user?.role || 'Analyst';
 
-  const steps = [
+  const analystSteps = [
     {
       number: 1,
-      title: 'Upload Your Customer Data',
-      description: 'Start by uploading your customer data in CSV format.',
+      title: 'View Available Models',
+      description: 'Browse trained models that are ready for predictions.',
+      details: [
+        'Navigate to the Models page',
+        'Review available trained models',
+        'Check model accuracy and performance metrics',
+        'Select the best model for your predictions',
+      ],
+      action: {
+        label: 'View Models',
+        path: '/models',
+      },
+      icon: Brain,
+      color: 'purple',
+    },
+    {
+      number: 2,
+      title: 'Make Single Predictions',
+      description: 'Predict churn for individual customers.',
+      details: [
+        'Enter customer data manually',
+        'Select a trained model version',
+        'View churn probability scores',
+        'Understand feature contributions with SHAP values',
+      ],
+      action: {
+        label: 'Single Prediction',
+        path: '/predictions/single',
+      },
+      icon: Target,
+      color: 'blue',
+    },
+    {
+      number: 3,
+      title: 'Batch Predictions',
+      description: 'Upload CSV files for bulk predictions.',
+      details: [
+        'Prepare CSV file with customer data',
+        'Upload file for batch processing',
+        'Monitor prediction progress',
+        'Download results when complete',
+      ],
+      action: {
+        label: 'Batch Predictions',
+        path: '/predictions/batch',
+      },
+      icon: BarChart3,
+      color: 'green',
+    },
+    {
+      number: 4,
+      title: 'View Prediction History',
+      description: 'Review past predictions and their results.',
+      details: [
+        'Access prediction history',
+        'Filter by date and model',
+        'Export prediction results',
+        'Track prediction accuracy over time',
+      ],
+      action: {
+        label: 'View History',
+        path: '/predictions',
+      },
+      icon: History,
+      color: 'indigo',
+    },
+    {
+      number: 5,
+      title: 'Generate Reports',
+      description: 'Create comprehensive reports to share insights.',
+      details: [
+        'Generate PDF reports with metrics and visualizations',
+        'Export prediction results as CSV',
+        'Share insights with stakeholders',
+        'Track model performance over time',
+      ],
+      action: {
+        label: 'Generate Reports',
+        path: '/reports',
+      },
+      icon: FileText,
+      color: 'amber',
+    },
+    {
+      number: 6,
+      title: 'Manage Notifications',
+      description: 'Stay updated with system notifications.',
+      details: [
+        'View prediction completion alerts',
+        'Check model availability notifications',
+        'Configure notification preferences',
+        'Mark notifications as read',
+      ],
+      action: {
+        label: 'Notifications',
+        path: '/notifications',
+      },
+      icon: Bell,
+      color: 'pink',
+    },
+  ];
+
+  const adminSteps = [
+    {
+      number: 1,
+      title: 'Upload Customer Data',
+      description: 'Upload and manage customer datasets for analysis.',
       details: [
         'Navigate to the Data Upload page',
         'Select a CSV file (up to 50MB)',
@@ -17,9 +141,11 @@ export default function GettingStartedPage() {
         'Wait for validation and processing to complete',
       ],
       action: {
-        label: 'Go to Upload',
+        label: 'Upload Data',
         path: '/data/upload',
       },
+      icon: Upload,
+      color: 'blue',
     },
     {
       number: 2,
@@ -35,6 +161,8 @@ export default function GettingStartedPage() {
         label: 'Explore Data',
         path: '/data/eda',
       },
+      icon: LineChart,
+      color: 'green',
     },
     {
       number: 3,
@@ -48,8 +176,10 @@ export default function GettingStartedPage() {
       ],
       action: {
         label: 'Train Models',
-        path: '/models/train',
+        path: '/models/training',
       },
+      icon: Brain,
+      color: 'purple',
     },
     {
       number: 4,
@@ -65,6 +195,8 @@ export default function GettingStartedPage() {
         label: 'Compare Models',
         path: '/models/comparison',
       },
+      icon: TrendingUp,
+      color: 'indigo',
     },
     {
       number: 5,
@@ -74,12 +206,14 @@ export default function GettingStartedPage() {
         'Enter customer data for single predictions',
         'Upload CSV files for batch predictions',
         'View churn probability scores',
-        'Understand feature contributions with SHAP values',
+        'Access prediction history and analytics',
       ],
       action: {
         label: 'Make Predictions',
         path: '/predictions/single',
       },
+      icon: Target,
+      color: 'pink',
     },
     {
       number: 6,
@@ -95,228 +229,140 @@ export default function GettingStartedPage() {
         label: 'Generate Reports',
         path: '/reports',
       },
+      icon: FileText,
+      color: 'amber',
     },
   ];
+
+  const steps = userRole === 'Admin' ? adminSteps : analystSteps;
+
+  const getColorClasses = (color: string) => {
+    const colors: Record<string, { bg: string; text: string; border: string; hover: string }> = {
+      blue: { bg: 'bg-blue-50 dark:bg-blue-900/20', text: 'text-blue-600 dark:text-blue-400', border: 'border-blue-200 dark:border-blue-800', hover: 'hover:bg-blue-100 dark:hover:bg-blue-900/30' },
+      green: { bg: 'bg-green-50 dark:bg-green-900/20', text: 'text-green-600 dark:text-green-400', border: 'border-green-200 dark:border-green-800', hover: 'hover:bg-green-100 dark:hover:bg-green-900/30' },
+      purple: { bg: 'bg-purple-50 dark:bg-purple-900/20', text: 'text-purple-600 dark:text-purple-400', border: 'border-purple-200 dark:border-purple-800', hover: 'hover:bg-purple-100 dark:hover:bg-purple-900/30' },
+      indigo: { bg: 'bg-indigo-50 dark:bg-indigo-900/20', text: 'text-indigo-600 dark:text-indigo-400', border: 'border-indigo-200 dark:border-indigo-800', hover: 'hover:bg-indigo-100 dark:hover:bg-indigo-900/30' },
+      pink: { bg: 'bg-pink-50 dark:bg-pink-900/20', text: 'text-pink-600 dark:text-pink-400', border: 'border-pink-200 dark:border-pink-800', hover: 'hover:bg-pink-100 dark:hover:bg-pink-900/30' },
+      amber: { bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400', border: 'border-amber-200 dark:border-amber-800', hover: 'hover:bg-amber-100 dark:hover:bg-amber-900/30' },
+    };
+    return colors[color] || colors.blue;
+  };
 
   return (
     <>
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Getting Started Guide
-        </h1>
-        <p className="text-lg text-muted-foreground">
-          Follow these steps to start predicting customer churn
-        </p>
-      </div>
-
-      <div className="bg-primary/5 border border-primary/20 rounded-lg p-6 mb-8">
-        <h2 className="text-xl font-semibold text-foreground mb-2">
-          Welcome to the Customer Churn Prediction Platform
-        </h2>
-        <p className="text-muted-foreground">
-          This platform helps you identify customers at risk of churning using machine learning.
-          Follow the steps below to get started with your first prediction model.
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        {steps.map((step) => (
-          <div
-            key={step.number}
-            className="bg-card shadow-sm rounded-lg p-6 border border-border"
-          >
-            <div className="flex items-start space-x-4">
-              <div className="shrink-0">
-                <div className="flex items-center justify-center w-12 h-12 rounded-full bg-primary text-primary-foreground text-xl font-bold">
-                  {step.number}
-                </div>
-              </div>
-
-              <div className="flex-1">
-                <h3 className="text-xl font-semibold text-foreground mb-2">
-                  {step.title}
-                </h3>
-                <p className="text-muted-foreground mb-4">
-                  {step.description}
-                </p>
-
-                <ul className="space-y-2 mb-4">
-                  {step.details.map((detail, index) => (
-                    <li
-                      key={index}
-                      className="flex items-start text-foreground/80"
-                    >
-                      <svg
-                        className="w-5 h-5 text-emerald-500 mr-2 mt-0.5 shrink-0"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                        aria-hidden="true"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M5 13l4 4L19 7"
-                        />
-                      </svg>
-                      {detail}
-                    </li>
-                  ))}
-                </ul>
-
-                <button
-                  onClick={() => router.push(step.action.path)}
-                  className="inline-flex items-center px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
-                >
-                  {step.action.label}
-                  <svg
-                    className="w-4 h-4 ml-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 5l7 7-7 7"
-                    />
-                  </svg>
-                </button>
-              </div>
-            </div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-purple-600">
+            <BookOpen className="w-6 h-6 text-white" aria-hidden="true" />
           </div>
-        ))}
-      </div>
-
-      <div className="mt-8 bg-card shadow-sm rounded-lg p-6 border border-border">
-        <h2 className="text-xl font-semibold text-foreground mb-4">
-          Additional Resources
-        </h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-start space-x-3">
-            <svg
-              className="w-6 h-6 text-primary flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"
-              />
-            </svg>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                Documentation
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Detailed guides and API references
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start space-x-3">
-            <svg
-              className="w-6 h-6 text-emerald-600 dark:text-emerald-400 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M18.364 5.636l-3.536 3.536m0 5.656l3.536 3.536M9.172 9.172L5.636 5.636m3.536 9.192l-3.536 3.536M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-5 0a4 4 0 11-8 0 4 4 0 018 0z"
-              />
-            </svg>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                Support
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Get help from our support team
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start space-x-3">
-            <svg
-              className="w-6 h-6 text-violet-600 dark:text-violet-400 flex-shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"
-              />
-            </svg>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                Video Tutorials
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Watch step-by-step video guides
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-start space-x-3">
-            <svg
-              className="w-6 h-6 text-amber-600 dark:text-amber-400 shrink-0"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"
-              />
-            </svg>
-            <div>
-              <h3 className="font-semibold text-foreground">
-                Community Forum
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                Connect with other users
-              </p>
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
+              Getting Started Guide
+            </h1>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-sm text-muted-foreground">
+                Role-specific guide for
+              </span>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300">
+                {userRole}
+              </span>
             </div>
           </div>
         </div>
+        <p className="text-lg text-muted-foreground">
+          {userRole === 'Admin' 
+            ? 'Complete guide to managing and overseeing the platform' 
+            : 'Follow these steps to start predicting customer churn'}
+        </p>
+      </div>
+
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-200 dark:border-blue-800 rounded-xl p-6 mb-8 shadow-sm">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            {userRole === 'Admin' ? (
+              <Users className="w-12 h-12 text-blue-600 dark:text-blue-400" />
+            ) : (
+              <Target className="w-12 h-12 text-purple-600 dark:text-purple-400" />
+            )}
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-foreground mb-2">
+              {userRole === 'Admin' 
+                ? 'Welcome, Administrator!' 
+                : 'Welcome to the Customer Churn Prediction Platform'}
+            </h2>
+            <p className="text-muted-foreground leading-relaxed">
+              {userRole === 'Admin'
+                ? 'As an administrator, you have full access to upload data, train models, make predictions, and generate reports. Use this guide to understand the complete workflow from data upload to insights generation.'
+                : 'As an analyst, you can make predictions using trained models and generate reports. Administrators handle data uploads and model training. Use this guide to understand how to work with available models.'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-6">
+        {steps.map((step) => {
+          const colors = getColorClasses(step.color);
+          const IconComponent = step.icon;
+          
+          return (
+            <div
+              key={step.number}
+              className={`bg-card shadow-md rounded-xl p-6 border-2 ${colors.border} transition-all hover:shadow-xl hover:scale-[1.02]`}
+            >
+              <div className="flex items-start space-x-5">
+                <div className="shrink-0">
+                  <div className={`flex items-center justify-center w-14 h-14 rounded-xl ${colors.bg} shadow-md`}>
+                    <IconComponent className={`w-7 h-7 ${colors.text}`} />
+                  </div>
+                  <div className={`text-center mt-2 text-sm font-bold ${colors.text}`}>
+                    Step {step.number}
+                  </div>
+                </div>
+
+                <div className="flex-1">
+                  <h3 className="text-2xl font-bold text-foreground mb-2">
+                    {step.title}
+                  </h3>
+                  <p className="text-muted-foreground mb-4 text-base">
+                    {step.description}
+                  </p>
+
+                  <ul className="space-y-2.5 mb-5">
+                    {step.details.map((detail, index) => (
+                      <li
+                        key={index}
+                        className="flex items-start text-foreground/90"
+                      >
+                        <CheckCircle
+                          className={`w-5 h-5 ${colors.text} mr-3 mt-0.5 shrink-0`}
+                          aria-hidden="true"
+                        />
+                        <span className="leading-relaxed">{detail}</span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <button
+                    onClick={() => router.push(step.action.path)}
+                    className={`inline-flex items-center px-5 py-2.5 ${colors.bg} ${colors.hover} ${colors.text} rounded-lg font-semibold transition-all focus:outline-none focus:ring-2 focus:ring-ring shadow-sm hover:shadow-md`}
+                  >
+                    {step.action.label}
+                    <ChevronRight className="w-4 h-4 ml-2" aria-hidden="true" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-8 text-center">
         <button
           onClick={() => router.push('/dashboard')}
-          className="inline-flex items-center px-6 py-3 bg-secondary hover:bg-secondary/80 text-secondary-foreground rounded-lg font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-ring"
+          className="inline-flex items-center px-8 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-ring"
         >
-          <svg
-            className="w-5 h-5 mr-2"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-            aria-hidden="true"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M10 19l-7-7m0 0l7-7m-7 7h18"
-            />
-          </svg>
+          <ArrowLeft className="w-5 h-5 mr-2" aria-hidden="true" />
           Back to Dashboard
         </button>
       </div>

@@ -42,10 +42,11 @@ export default function BatchPredictionPage() {
       try {
         setIsLoadingModels(true);
         const response = await listModelVersions(token, { status: 'active' });
-        setModelVersions(response.versions);
+        const versions = Array.isArray(response?.versions) ? response.versions : [];
+        setModelVersions(versions);
         
-        if (response.versions.length > 0) {
-          setSelectedModelId(response.versions[0].id);
+        if (versions.length > 0) {
+          setSelectedModelId(versions[0].id);
         }
       } catch (err) {
         console.error('Error loading model versions:', err);

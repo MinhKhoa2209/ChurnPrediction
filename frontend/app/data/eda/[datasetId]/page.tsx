@@ -243,9 +243,9 @@ export default function EDAPage() {
               <div className="flex items-center">
                 <button
                   onClick={handleBackToDashboard}
-                  className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
+                  className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300"
                 >
-                  Back to Dashboard
+                  ← Back to Dashboard
                 </button>
               </div>
             </div>
@@ -272,20 +272,15 @@ export default function EDAPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between h-16">
             <div className="flex items-center">
+              <button
+                onClick={handleBackToDashboard}
+                className="text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mr-4"
+              >
+                ← Back
+              </button>
               <h1 className="text-xl font-bold text-gray-900 dark:text-foreground">
                 Exploratory Data Analysis
               </h1>
-            </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-700 dark:text-gray-300">
-                {user.email} ({user.role})
-              </span>
-              <button
-                onClick={handleBackToDashboard}
-                className="text-sm text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-primary-foreground"
-              >
-                Back to Dashboard
-              </button>
             </div>
           </div>
         </div>

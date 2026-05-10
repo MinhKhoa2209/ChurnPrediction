@@ -70,7 +70,7 @@ export default function FeatureEngineeringPage() {
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
-  const canModifyFeatures = user?.role === 'Admin' || user?.role === 'Data_Scientist';
+  const canModifyFeatures = user?.role === 'Admin';
 
   const fetchFeatureImportance = useCallback(async () => {
     try {
@@ -404,7 +404,7 @@ export default function FeatureEngineeringPage() {
                 </h2>
                 {!canModifyFeatures && (
                   <span className="text-sm text-yellow-600 dark:text-yellow-400">
-                    View Only - Requires Data_Scientist or Admin role
+                    View Only - Requires Admin role
                   </span>
                 )}
               </div>
@@ -554,7 +554,7 @@ export default function FeatureEngineeringPage() {
 
             {!canModifyFeatures && (
               <p className="text-sm text-yellow-600 dark:text-yellow-400 mb-6">
-                Requires Data_Scientist or Admin role to create interaction features
+                Requires Admin role to create interaction features
               </p>
             )}
 

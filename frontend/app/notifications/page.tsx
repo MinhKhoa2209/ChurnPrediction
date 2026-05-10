@@ -9,6 +9,7 @@ import {
   markAllAsRead,
   type Notification,
 } from '@/lib/notifications';
+import { CheckCircle, XCircle, Info, BellOff } from 'lucide-react';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -30,7 +31,7 @@ export default function NotificationsPage() {
         token,
         filter === 'unread'
       );
-      setNotifications(notificationsData);
+      setNotifications(Array.isArray(notificationsData) ? notificationsData : []);
     } catch (err) {
       console.error('Error loading notifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to load notifications');
@@ -92,26 +93,20 @@ export default function NotificationsPage() {
     if (type === 'training_completed') {
       return (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-          <svg className="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+          <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
         </div>
       );
     }
     if (type === 'training_failed') {
       return (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-          <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
+          <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
         </div>
       );
     }
     return (
       <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-        <svg className="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
+        <Info className="w-6 h-6 text-blue-600 dark:text-blue-400" />
       </div>
     );
   };
@@ -210,19 +205,7 @@ export default function NotificationsPage() {
 
           {!loading && notifications.length === 0 && (
             <div className="bg-white dark:bg-card shadow rounded-lg p-12 text-center">
-              <svg
-                className="mx-auto h-12 w-12 text-gray-400"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
-                />
-              </svg>
+              <BellOff className="mx-auto h-12 w-12 text-gray-400" />
               <h3 className="mt-2 text-sm font-medium text-gray-900 dark:text-foreground">
                 No notifications
               </h3>

@@ -1,5 +1,3 @@
-"""Pydantic schemas package"""
-
 from backend.domain.schemas.auth import (
     AuthResponse,
     LoginRequest,
@@ -8,22 +6,9 @@ from backend.domain.schemas.auth import (
     UserResponse,
 )
 from backend.domain.schemas.dataset import (
-    DatasetUploadResponse,
-    DatasetResponse,
     DatasetListResponse,
-)
-from backend.domain.schemas.training import (
-    TrainingJobCreate,
-    TrainingJobCreateResponse,
-    TrainingJobListResponse,
-    TrainingJobResponse,
-)
-from backend.domain.schemas.prediction import (
-    PredictionInput,
-    SinglePredictionRequest,
-    PredictionResponse,
-    ValidationErrorDetail,
-    ValidationErrorResponse,
+    DatasetResponse,
+    DatasetUploadResponse,
 )
 from backend.domain.schemas.errors import (
     ErrorCode,
@@ -32,6 +17,19 @@ from backend.domain.schemas.errors import (
     ErrorResponse,
     create_error_response,
     create_validation_error_details,
+)
+from backend.domain.schemas.prediction import (
+    PredictionInput,
+    PredictionResponse,
+    SinglePredictionRequest,
+    ValidationErrorDetail,
+    ValidationErrorResponse,
+)
+from backend.domain.schemas.training import (
+    TrainingJobCreate,
+    TrainingJobCreateResponse,
+    TrainingJobListResponse,
+    TrainingJobResponse,
 )
 
 __all__ = [

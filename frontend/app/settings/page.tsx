@@ -1,26 +1,61 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useTheme } from 'next-themes';
 import { API_BASE_URL } from '@/lib/api';
+import { Camera, User } from 'lucide-react';
 
 export default function SettingsPage() {
-  const { user, token } = useAuthStore();
+  const { user, token, setAuth } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const [emailNotifications, setEmailNotifications] = useState(false);
+  const [name, setName] = useState('');
+  const [avatar, setAvatar] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
       queueMicrotask(() => {
         setEmailNotifications(user.email_notifications_enabled || false);
+        setName(user.name || '');
+        setAvatar(user.avatar || '');
       });
     }
   }, [user]);
 
-  const handleSaveNotifications = async () => {
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      setSaveMessage({ type: 'error', text: 'Please select an image file' });
+      return;
+    }
+
+    // Validate file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      setSaveMessage({ type: 'error', text: 'Image size must be less than 2MB' });
+      return;
+    }
+
+    // Convert to base64
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setAvatar(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleSaveProfile = async () => {
     if (!token) return;
 
     setIsLoading(true);
@@ -35,19 +70,33 @@ export default function SettingsPage() {
         },
         body: JSON.stringify({
           email_notifications_enabled: emailNotifications,
+          name: name.trim() || null,
+          avatar: avatar || null,
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to save notification preferences');
+        throw new Error('Failed to save profile settings');
       }
 
-      setSaveMessage({ type: 'success', text: 'Notification preferences saved successfully' });
+      const updatedUser = await response.json();
+      
+      // Update auth store with new user data
+      if (user) {
+        setAuth({
+          ...user,
+          name: updatedUser.name,
+          avatar: updatedUser.avatar,
+          email_notifications_enabled: updatedUser.email_notifications_enabled,
+        }, token);
+      }
+
+      setSaveMessage({ type: 'success', text: 'Profile updated successfully' });
       
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
-      console.error('Error saving notification preferences:', error);
-      setSaveMessage({ type: 'error', text: 'Failed to save notification preferences' });
+      console.error('Error saving profile settings:', error);
+      setSaveMessage({ type: 'error', text: 'Failed to save profile settings' });
     } finally {
       setIsLoading(false);
     }
@@ -73,6 +122,71 @@ export default function SettingsPage() {
           Profile
         </h2>
         <div className="space-y-4">
+          {/* Avatar Upload */}
+          <div className="flex items-center space-x-4">
+            <div className="relative">
+              <div 
+                className="w-24 h-24 rounded-full bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={handleAvatarClick}
+              >
+                {avatar ? (
+                  <img 
+                    src={avatar} 
+                    alt="User avatar" 
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="w-12 h-12 text-muted-foreground" />
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={handleAvatarClick}
+                className="absolute bottom-0 right-0 p-2 bg-primary text-primary-foreground rounded-full hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                aria-label="Upload avatar"
+              >
+                <Camera className="w-4 h-4" />
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileChange}
+                className="hidden"
+                aria-label="Avatar file input"
+              />
+            </div>
+            <div>
+              <p className="text-sm font-medium text-foreground">Profile Picture</p>
+              <p className="text-xs text-muted-foreground">
+                Click to upload a new avatar (max 2MB)
+              </p>
+            </div>
+          </div>
+
+          {/* Name Input */}
+          <div>
+            <label 
+              htmlFor="name" 
+              className="block text-sm font-medium mb-2 text-muted-foreground"
+            >
+              Name
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Enter your name"
+              className="w-full px-3 py-2 border border-border rounded-lg bg-input text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+              aria-describedby="name-description"
+            />
+            <p id="name-description" className="mt-1 text-xs text-muted-foreground">
+              Your display name
+            </p>
+          </div>
+
+          {/* Email (Read-only) */}
           <div>
             <label 
               htmlFor="email" 
@@ -92,6 +206,8 @@ export default function SettingsPage() {
               Email cannot be changed
             </p>
           </div>
+
+          {/* Role (Read-only) */}
           <div>
             <label 
               htmlFor="role" 
@@ -192,10 +308,10 @@ export default function SettingsPage() {
           )}
 
           <button
-            onClick={handleSaveNotifications}
+            onClick={handleSaveProfile}
             disabled={isLoading}
             className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            aria-label="Save notification preferences"
+            aria-label="Save profile settings"
           >
             {isLoading ? 'Saving...' : 'Save Preferences'}
           </button>

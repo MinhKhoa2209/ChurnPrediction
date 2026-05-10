@@ -12,6 +12,7 @@ import {
 import { listModelVersions, type ModelVersionListItem } from '@/lib/models';
 import PredictionForm from '@/components/predictions/prediction-form';
 import PredictionResult from '@/components/predictions/prediction-result';
+import { AlertTriangle, AlertCircle, BarChart3 } from 'lucide-react';
 
 export default function PredictionsPage() {
   const router = useRouter();
@@ -33,10 +34,11 @@ export default function PredictionsPage() {
         setIsLoadingModels(true);
         setError(null);
         const response = await listModelVersions(token, { status: 'active' });
-        setModelVersions(response.versions);
+        const versions = Array.isArray(response?.versions) ? response.versions : [];
+        setModelVersions(versions);
         
-        if (response.versions.length > 0) {
-          setSelectedModelId(response.versions[0].id);
+        if (versions.length > 0) {
+          setSelectedModelId(versions[0].id);
         }
       } catch (err) {
         console.error('Error loading model versions:', err);
@@ -146,19 +148,7 @@ export default function PredictionsPage() {
             ) : modelVersions.length === 0 ? (
               <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
                 <div className="flex items-center">
-                  <svg
-                    className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
-                  </svg>
+                  <AlertTriangle className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mr-2" />
                   <div>
                     <p className="text-sm font-medium text-yellow-800 dark:text-yellow-200">
                       No Active Models Available
@@ -201,19 +191,7 @@ export default function PredictionsPage() {
           {error && (
             <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
               <div className="flex items-center">
-                <svg
-                  className="w-5 h-5 text-red-600 dark:text-red-400 mr-2"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 mr-2" />
                 <div>
                   <p className="text-sm font-medium text-red-800 dark:text-red-200">Error</p>
                   <p className="text-sm text-red-700 dark:text-red-300 mt-1">{error}</p>
@@ -241,19 +219,9 @@ export default function PredictionsPage() {
               ) : (
                 <div className="bg-white dark:bg-card shadow rounded-lg p-6 h-full flex items-center justify-center">
                   <div className="text-center text-gray-500 dark:text-gray-400">
-                    <svg
+                    <BarChart3
                       className="w-16 h-16 mx-auto mb-4 text-gray-300 dark:text-gray-600"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={1.5}
-                        d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-                      />
-                    </svg>
+                    />
                     <p className="text-lg font-medium">No Prediction Yet</p>
                     <p className="text-sm mt-2">
                       Fill out the customer information form and click "Predict Churn" to see results

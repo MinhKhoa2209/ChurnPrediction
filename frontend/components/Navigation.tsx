@@ -7,6 +7,8 @@ import { useAuthStore } from '@/lib/store/auth-store';
 import { logout as logoutApi } from '@/lib/auth';
 import { trapFocus, announceToScreenReader } from '@/lib/accessibility';
 import { ThemeToggle } from '@/components/ThemeToggle';
+import { getUnreadCount } from '@/lib/notifications';
+import { Menu, X } from 'lucide-react';
 
 interface NavItem {
   label: string;
@@ -16,14 +18,16 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Getting Started', href: '/getting-started', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Data Upload', href: '/data/upload', roles: ['Admin', 'Data_Scientist'] },
-  { label: 'Models', href: '/models', roles: ['Admin', 'Data_Scientist'] },
-  { label: 'Predictions', href: '/predictions', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Reports', href: '/reports', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Notifications', href: '/notifications', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Settings', href: '/settings', roles: ['Admin', 'Data_Scientist', 'Analyst'] },
+  { label: 'Dashboard', href: '/dashboard', roles: ['Admin', 'Analyst'] },
+  { label: 'Getting Started', href: '/getting-started', roles: ['Admin', 'Analyst'] },
+  { label: 'Data Upload', href: '/data/upload', roles: ['Admin'] },
+  { label: 'Data Processing', href: '/data/processing', roles: ['Admin'] },
+  { label: 'Models', href: '/models', roles: ['Admin', 'Analyst'] },
+  { label: 'Predictions', href: '/predictions', roles: ['Admin', 'Analyst'] },
+  { label: 'Reports', href: '/reports', roles: ['Admin', 'Analyst'] },
+  { label: 'Notifications', href: '/notifications', roles: ['Admin', 'Analyst'] },
+  { label: 'Users', href: '/admin/users', roles: ['Admin'] },
+  { label: 'Settings', href: '/settings', roles: ['Admin', 'Analyst'] },
 ];
 
 export function Navigation() {
@@ -31,11 +35,48 @@ export function Navigation() {
   const router = useRouter();
   const { user, token, clearAuth } = useAuthStore();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   const visibleNavItems = navItems.filter(
     (item) => !item.roles || (user?.role && item.roles.includes(user.role))
   );
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (token) {
+        try {
+          const count = await getUnreadCount(token);
+          setUnreadCount(count);
+        } catch (error) {
+          console.error('Error fetching unread count:', error);
+        }
+      }
+    };
+
+    fetchUnreadCount();
+    
+    // Poll every 30 seconds for new notifications
+    const interval = setInterval(fetchUnreadCount, 30000);
+    
+    return () => clearInterval(interval);
+  }, [token]);
+
+  // Refresh unread count when pathname changes (e.g., after marking as read)
+  useEffect(() => {
+    if (token && pathname === '/notifications') {
+      const fetchUnreadCount = async () => {
+        try {
+          const count = await getUnreadCount(token);
+          setUnreadCount(count);
+        } catch (error) {
+          console.error('Error fetching unread count:', error);
+        }
+      };
+      fetchUnreadCount();
+    }
+  }, [pathname, token]);
 
   const toggleMobileMenu = () => {
     const newState = !isMobileMenuOpen;
@@ -110,11 +151,13 @@ export function Navigation() {
           <div className="hidden md:flex md:items-center md:space-x-4">
             {visibleNavItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const isNotifications = item.href === '/notifications';
+              
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-3 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`relative px-3 py-2 rounded-md text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isActive
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
@@ -122,6 +165,11 @@ export function Navigation() {
                   aria-current={isActive ? 'page' : undefined}
                 >
                   {item.label}
+                  {isNotifications && unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}
@@ -153,35 +201,9 @@ export function Navigation() {
                 {isMobileMenuOpen ? 'Close menu' : 'Open menu'}
               </span>
               {isMobileMenuOpen ? (
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M6 18L18 6M6 6l12 12"
-                  />
-                </svg>
+                <X className="h-6 w-6" aria-hidden="true" />
               ) : (
-                <svg
-                  className="h-6 w-6"
-                  fill="none"
-                  viewBox="0 0 24 24"
-                  stroke="currentColor"
-                  aria-hidden="true"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M4 6h16M4 12h16M4 18h16"
-                  />
-                </svg>
+                <Menu className="h-6 w-6" aria-hidden="true" />
               )}
             </button>
           </div>
@@ -197,18 +219,25 @@ export function Navigation() {
           <div className="px-2 pt-2 pb-3 space-y-1">
             {visibleNavItems.map((item) => {
               const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
+              const isNotifications = item.href === '/notifications';
+              
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`block px-3 py-2 rounded-md text-base font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                  className={`relative flex items-center justify-between px-3 py-2 rounded-md text-base font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                     isActive
                       ? 'bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700'
                   }`}
                   aria-current={isActive ? 'page' : undefined}
                 >
-                  {item.label}
+                  <span>{item.label}</span>
+                  {isNotifications && unreadCount > 0 && (
+                    <span className="inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white bg-red-600 rounded-full">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
                 </Link>
               );
             })}

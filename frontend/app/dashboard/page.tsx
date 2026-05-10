@@ -294,7 +294,7 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Actions */}
-      {(user.role === 'Admin' || user.role === 'Data_Scientist') && (
+      {user.role === 'Admin' && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>

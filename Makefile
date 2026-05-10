@@ -28,6 +28,9 @@ help:
 	@echo "  make migrate-create - Create new migration"
 	@echo "  make db-shell       - Connect to PostgreSQL shell"
 	@echo "  make redis-shell    - Connect to Redis shell"
+	@echo "  make db-check       - Check database status and users"
+	@echo "  make db-reset       - Reset database (delete all data)"
+	@echo "  make quick-admin    - Create quick admin user"
 	@echo ""
 	@echo "Development:"
 	@echo "  make shell-backend  - Access backend container shell"
@@ -121,3 +124,26 @@ clean-all:
 
 prune:
 	docker system prune -a --volumes
+
+# Admin Management
+quick-admin:
+	@echo "Creating quick admin user (admin@churnpredict.com / Admin@123)..."
+	@docker-compose exec -T backend python -c "import sys; sys.path.insert(0, '/app'); from sqlalchemy import create_engine; from sqlalchemy.orm import sessionmaker; from backend.domain.models.user import User; from backend.services.auth_service import AuthService; from backend.config import settings; engine = create_engine(settings.database_url); SessionLocal = sessionmaker(bind=engine); db = SessionLocal(); email = 'admin@churnpredict.com'; password = 'Admin@123'; name = 'Admin'; existing = db.query(User).filter(User.email == email).first(); result = 'Updated' if existing else 'Created'; user = existing if existing else User(); user.email = email; user.name = name; user.password_hash = AuthService._hash_password(password); user.role = 'Admin'; user.email_verified = True; user.auth_provider = 'local'; db.add(user) if not existing else None; db.commit(); print(f'✅ {result} admin user'); print(f'📧 Email: {email}'); print(f'🔒 Password: {password}'); print('🌐 Login: http://localhost:3000/login'); db.close()"
+
+db-check:
+	@echo "Checking database status..."
+	@docker-compose exec -T postgres psql -U churn_user -d churn_prediction -c "\dt"
+	@docker-compose exec -T postgres psql -U churn_user -d churn_prediction -c "SELECT COUNT(*) as total_users FROM users;"
+	@docker-compose exec -T postgres psql -U churn_user -d churn_prediction -c "SELECT id, email, role, created_at FROM users ORDER BY created_at DESC;"
+
+db-reset:
+	@echo "⚠️  WARNING: This will delete all data!"
+	@echo "Press Ctrl+C to cancel, or Enter to continue..."
+	@read confirm
+	@docker stop churn-backend churn-celery-worker
+	@docker exec churn-postgres psql -U churn_user -d churn_prediction -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public; GRANT ALL ON SCHEMA public TO churn_user; GRANT ALL ON SCHEMA public TO public;"
+	@docker start churn-backend
+	@sleep 5
+	@docker exec churn-backend alembic upgrade head
+	@docker start churn-celery-worker
+	@echo "✅ Database reset complete!"

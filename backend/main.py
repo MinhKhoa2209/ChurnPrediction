@@ -1,38 +1,51 @@
-"""
-FastAPI Application Entry Point
-Customer Churn Prediction Platform Backend
-"""
-
 import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.sessions import SessionMiddleware
 
-from backend.api.routes import auth, dashboard, datasets, eda, features, models, notifications, predictions, reports, users, websocket
+from backend.api.exception_handlers import register_exception_handlers
 from backend.api.middleware import (
+    DegradedModeMiddleware,
     RateLimitMiddleware,
     RequestIDMiddleware,
-    UserContextMiddleware,
     RequestLoggingMiddleware,
-    DegradedModeMiddleware,
-    get_redis_client
+    UserContextMiddleware,
+    get_redis_client,
 )
-from backend.api.exception_handlers import register_exception_handlers
-from backend.config import settings, get_config_summary
+from backend.api.routes import (
+    auth,
+    dashboard,
+    datasets,
+    eda,
+    features,
+    models,
+    notifications,
+    oauth,
+    predictions,
+    reports,
+    users,
+    websocket,
+)
+from backend.config import get_config_summary, settings
 
-# Configure structured logging
 logging.basicConfig(
     level=getattr(logging, settings.log_level.upper(), logging.INFO),
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S'
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 logger = logging.getLogger(__name__)
 
-# OpenAPI schema configuration
+
 openapi_tags_metadata = [
     {
         "name": "Authentication",
         "description": "User authentication and authorization endpoints. Includes registration, login, logout, and password management.",
+    },
+    {
+        "name": "OAuth Authentication",
+        "description": "OAuth 2.0 authentication endpoints. Sign in with Google, GitHub, or Microsoft accounts.",
     },
     {
         "name": "Datasets",
@@ -83,7 +96,7 @@ openapi_tags_metadata = [
 app = FastAPI(
     title="Customer Churn Prediction Platform API",
     description="""
-## Overview
+Overview
 
 The Customer Churn Prediction Platform API provides a comprehensive machine learning solution for predicting customer churn. 
 This production-ready API enables data scientists, analysts, and developers to:
@@ -96,7 +109,7 @@ This production-ready API enables data scientists, analysts, and developers to:
 - Create detailed reports with model insights
 - Monitor training progress in real-time
 
-## Authentication
+Authentication
 
 Most endpoints require JWT authentication. Include the access token in the Authorization header:
 
@@ -106,7 +119,7 @@ Authorization: Bearer <your_access_token>
 
 Obtain an access token by calling the `/api/v1/auth/login` endpoint with valid credentials.
 
-## Rate Limiting
+Rate Limiting
 
 API requests are rate-limited to 100 requests per minute per user/IP address. 
 Rate limit information is included in response headers:
@@ -114,7 +127,7 @@ Rate limit information is included in response headers:
 - `X-RateLimit-Remaining`: Remaining requests in current window
 - `X-RateLimit-Reset`: Time when the rate limit resets (Unix timestamp)
 
-## Error Responses
+Error Responses
 
 All error responses follow a consistent format with the following fields:
 - `error`: Error code (e.g., "VALIDATION_ERROR", "UNAUTHORIZED")
@@ -131,19 +144,18 @@ Common HTTP status codes:
 - `422 Unprocessable Entity`: Validation error in request body
 - `503 Service Unavailable`: Service temporarily unavailable (degraded mode)
 
-## Versioning
+Versioning
 
 The API is versioned using URL path prefixes. Current version: `v1`
 
 Base URL: `/api/v1`
 
-## Support
+Support
 
 For issues or questions, please contact the platform administrators.
     """,
     version="1.0.0",
     openapi_tags=openapi_tags_metadata,
-    # Docs accessible without auth in dev, requires auth in production
     docs_url="/docs" if settings.environment == "development" else None,
     redoc_url="/redoc" if settings.environment == "development" else None,
     openapi_url="/openapi.json",
@@ -171,20 +183,16 @@ For issues or questions, please contact the platform administrators.
         "tryItOutEnabled": True,
         "docExpansion": "none",
         "defaultModelsExpandDepth": 1,
-    }
+    },
 )
 
-# Add JWT Bearer authentication to OpenAPI schema
+
 def custom_openapi():
-    """
-    Customize OpenAPI schema to include JWT Bearer authentication
-    """
     if app.openapi_schema:
         return app.openapi_schema
-    
-    # Get the default OpenAPI schema from FastAPI
+
     from fastapi.openapi.utils import get_openapi
-    
+
     openapi_schema = get_openapi(
         title=app.title,
         version=app.version,
@@ -196,51 +204,48 @@ def custom_openapi():
         contact=app.contact,
         license_info=app.license_info,
     )
-    
-    # Add security scheme for JWT Bearer authentication
+
     if "components" not in openapi_schema:
         openapi_schema["components"] = {}
-    
+
     openapi_schema["components"]["securitySchemes"] = {
         "BearerAuth": {
             "type": "http",
             "scheme": "bearer",
             "bearerFormat": "JWT",
-            "description": "Enter your JWT token obtained from the /api/v1/auth/login endpoint"
+            "description": "Enter your JWT token obtained from the /api/v1/auth/login endpoint",
         }
     }
-    
-    # Apply security to all endpoints except auth endpoints
+
     for path, path_item in openapi_schema["paths"].items():
-        # Skip authentication endpoints (login, register)
         if "/auth/login" in path or "/auth/register" in path:
             continue
-        
+
         for method in path_item:
             if method in ["get", "post", "put", "delete", "patch"]:
                 if "security" not in path_item[method]:
                     path_item[method]["security"] = [{"BearerAuth": []}]
-    
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
+
 app.openapi = custom_openapi
 
-# Register exception handlers
+
 if settings.environment != "development":
-    from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html
+    from typing import Annotated
+
     from fastapi import Depends
+    from fastapi.openapi.docs import get_redoc_html, get_swagger_ui_html
+
     from backend.api.dependencies import get_current_user
     from backend.domain.schemas.auth import UserResponse
-    from typing import Annotated
-    
+
     @app.get("/docs", include_in_schema=False)
     async def get_swagger_documentation(
-        current_user: Annotated[UserResponse, Depends(get_current_user)]
+        current_user: Annotated[UserResponse, Depends(get_current_user)],
     ):
-        """
-        Swagger UI documentation (requires authentication in production)
-        """
         return get_swagger_ui_html(
             openapi_url="/openapi.json",
             title=f"{app.title} - Swagger UI",
@@ -249,17 +254,14 @@ if settings.environment != "development":
                 "persistAuthorization": True,
                 "displayRequestDuration": True,
                 "filter": True,
-                "tryItOutEnabled": True
-            }
+                "tryItOutEnabled": True,
+            },
         )
-    
+
     @app.get("/redoc", include_in_schema=False)
     async def get_redoc_documentation(
-        current_user: Annotated[UserResponse, Depends(get_current_user)]
+        current_user: Annotated[UserResponse, Depends(get_current_user)],
     ):
-        """
-        ReDoc documentation (requires authentication in production)
-        """
         return get_redoc_html(
             openapi_url="/openapi.json",
             title=f"{app.title} - ReDoc",
@@ -267,40 +269,23 @@ if settings.environment != "development":
             with_google_fonts=True,
         )
 
-# Register exception handlers
-# Provides structured error responses with error codes, messages, details, requestId, and timestamp
+
 register_exception_handlers(app)
 
-# Request ID middleware
-# Generates unique request IDs for tracking and debugging
-app.add_middleware(RequestIDMiddleware)
+# Add SessionMiddleware for OAuth (must be added before other middleware)
+app.add_middleware(
+    SessionMiddleware,
+    secret_key=settings.jwt_secret_key,
+    session_cookie="churn_session",
+    max_age=3600,  # 1 hour
+    same_site="lax",
+    https_only=settings.environment == "production",
+)
 
-# Degraded mode middleware
-# Detects service unavailability and adds degraded mode headers
-app.add_middleware(DegradedModeMiddleware)
-
-# User context middleware
-# Extracts user ID from JWT token and attaches to request state for logging
-app.add_middleware(UserContextMiddleware)
-
-# Request logging middleware
-# Logs all API requests with method, path, status code, response time
-# Integrates with OpenTelemetry for distributed tracing
-app.add_middleware(RequestLoggingMiddleware)
-
-# Rate limiting middleware
-# Implements rate limiting of 100 requests per minute per user/IP
-redis_client = get_redis_client()
-app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
-
-# CORS middleware configuration
-# Bugfix: Accept all localhost variations in development mode
-# IMPORTANT: CORS middleware MUST be added LAST so it runs FIRST (middleware runs in LIFO order)
-# This ensures CORS headers are added to ALL responses, including error responses
+# Add CORS middleware (must be added early to handle preflight requests)
 if settings.environment == "development":
-    # Development: Use custom middleware to accept all localhost variations
     from backend.api.cors_middleware import DevelopmentCORSMiddleware
-    
+
     app.add_middleware(
         DevelopmentCORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -309,7 +294,6 @@ if settings.environment == "development":
         allow_headers=["*"],
     )
 else:
-    # Production: Use explicit whitelist of allowed origins
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -318,9 +302,24 @@ else:
         allow_headers=["*"],
     )
 
-# Include routers
-# All routes use JWT authentication and RBAC
+app.add_middleware(RequestIDMiddleware)
+
+
+app.add_middleware(DegradedModeMiddleware)
+
+
+app.add_middleware(UserContextMiddleware)
+
+
+app.add_middleware(RequestLoggingMiddleware)
+
+
+redis_client = get_redis_client()
+app.add_middleware(RateLimitMiddleware, redis_client=redis_client)
+
+
 app.include_router(auth.router, prefix=settings.api_v1_prefix)
+app.include_router(oauth.router, prefix=settings.api_v1_prefix)
 app.include_router(dashboard.router, prefix=settings.api_v1_prefix)
 app.include_router(datasets.router, prefix=settings.api_v1_prefix)
 app.include_router(eda.router, prefix=settings.api_v1_prefix)
@@ -335,7 +334,6 @@ app.include_router(websocket.router, prefix=settings.api_v1_prefix)
 
 @app.get("/")
 async def root():
-    """Health check endpoint"""
     logger.info("Health check endpoint accessed")
     return {
         "status": "healthy",
@@ -347,29 +345,18 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """
-    Detailed health check endpoint
-    Returns configuration status (without sensitive values)
-    
-    Returns:
-        200 OK: System is healthy or degraded but functional
-        503 Service Unavailable: Database is down (critical failure)
-    """
+    from fastapi.responses import JSONResponse
+
     from backend.infrastructure.cache import get_cache_status
     from backend.infrastructure.database import check_database_health
-    from fastapi.responses import JSONResponse
-    
+
     logger.info("Detailed health check endpoint accessed")
     config_summary = get_config_summary()
-    
-    # Check cache status
+
     cache_status = get_cache_status()
-    
-    # Check database connectivity
+
     db_available = check_database_health()
-    
-    # Determine overall status
-    # Return 503 when database is unavailable
+
     if not db_available:
         logger.error("Health check failed: Database unavailable")
         return JSONResponse(
@@ -377,30 +364,23 @@ async def health_check():
                 "status": "unavailable",
                 "degraded_mode": False,
                 "services": {
-                    "database": {
-                        "available": False,
-                        "status": "unavailable"
-                    },
+                    "database": {"available": False, "status": "unavailable"},
                     "cache": cache_status,
                 },
                 "configuration": config_summary,
             },
             status_code=503,
-            headers={"Retry-After": "60"}  # Include retry-after header
+            headers={"Retry-After": "60"},
         )
-    
-    # System is healthy or degraded (cache unavailable but database is up)
+
     degraded = not cache_status["available"]
     overall_status = "degraded" if degraded else "healthy"
-    
+
     return {
         "status": overall_status,
         "degraded_mode": degraded,
         "services": {
-            "database": {
-                "available": db_available,
-                "status": "healthy"
-            },
+            "database": {"available": db_available, "status": "healthy"},
             "cache": cache_status,
         },
         "configuration": config_summary,
@@ -409,9 +389,6 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    """
-    Application startup event handler
-    """
     logger.info("=" * 80)
     logger.info("Customer Churn Prediction Platform API Starting")
     logger.info("=" * 80)
@@ -423,9 +400,6 @@ async def startup_event():
 
 @app.on_event("shutdown")
 async def shutdown_event():
-    """
-    Application shutdown event handler
-    """
     logger.info("=" * 80)
     logger.info("Customer Churn Prediction Platform API Shutting Down")
     logger.info("=" * 80)

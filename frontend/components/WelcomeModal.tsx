@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { X, Zap, Cpu, BarChart3, CloudUpload, BrainCircuit, ChevronLeft, ChevronRight, Rocket, BookOpen, FileText } from 'lucide-react';
 
 const WELCOME_MODAL_KEY = 'churn-platform-welcome-shown';
 
 interface WelcomeModalProps {
   onClose?: () => void;
+  userRole?: 'Admin' | 'Analyst';
 }
 
-export function WelcomeModal({ onClose }: WelcomeModalProps) {
+export function WelcomeModal({ onClose, userRole = 'Analyst' }: WelcomeModalProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const router = useRouter();
@@ -29,7 +31,7 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
 
   const handleGetStarted = () => {
     handleClose();
-    router.push('/data/upload');
+    router.push(userRole === 'Admin' ? '/data/upload' : '/predictions/single');
   };
 
   const handleViewGuide = () => {
@@ -37,68 +39,43 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
     router.push('/getting-started');
   };
 
-  const steps = [
+  const analystSteps = [
     {
-      title: 'Upload Data',
-      description: 'Start by uploading your customer data in CSV format. The platform supports files up to 50MB.',
-      icon: (
-        <svg
-          className="w-12 h-12 text-blue-600 dark:text-blue-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-          />
-        </svg>
-      ),
-    },
-    {
-      title: 'Train Models',
-      description: 'Train multiple machine learning models on your data. The platform automatically handles preprocessing and optimization.',
-      icon: (
-        <svg
-          className="w-12 h-12 text-green-600 dark:text-green-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"
-          />
-        </svg>
-      ),
+      title: 'View Models',
+      description: 'Browse available trained models and check their performance metrics.',
+      icon: <Cpu className="w-12 h-12 text-purple-600 dark:text-purple-400" />,
     },
     {
       title: 'Make Predictions',
-      description: 'Use trained models to predict customer churn. Get probability scores and insights to take proactive action.',
-      icon: (
-        <svg
-          className="w-12 h-12 text-purple-600 dark:text-purple-400"
-          fill="none"
-          stroke="currentColor"
-          viewBox="0 0 24 24"
-          aria-hidden="true"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"
-          />
-        </svg>
-      ),
+      description: 'Use trained models to predict customer churn with single or batch predictions.',
+      icon: <BarChart3 className="w-12 h-12 text-blue-600 dark:text-blue-400" />,
+    },
+    {
+      title: 'Generate Reports',
+      description: 'Create comprehensive reports and export prediction results for analysis.',
+      icon: <FileText className="w-12 h-12 text-green-600 dark:text-green-400" />,
     },
   ];
+
+  const adminSteps = [
+    {
+      title: 'Upload Data',
+      description: 'Start by uploading customer data in CSV format for analysis and model training.',
+      icon: <CloudUpload className="w-12 h-12 text-blue-600 dark:text-blue-400" />,
+    },
+    {
+      title: 'Train Models',
+      description: 'Train multiple machine learning models with automatic preprocessing and optimization.',
+      icon: <BrainCircuit className="w-12 h-12 text-green-600 dark:text-green-400" />,
+    },
+    {
+      title: 'Make Predictions',
+      description: 'Use trained models to predict customer churn and generate actionable insights.',
+      icon: <BarChart3 className="w-12 h-12 text-purple-600 dark:text-purple-400" />,
+    },
+  ];
+
+  const steps = userRole === 'Admin' ? adminSteps : analystSteps;
 
   if (!isOpen) {
     return null;
@@ -112,72 +89,92 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
       aria-labelledby="welcome-modal-title"
     >
       <div
-        className="fixed inset-0 bg-background bg-opacity-50 transition-opacity"
+        className="fixed inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={handleClose}
         aria-hidden="true"
       />
 
       <div className="flex min-h-full items-center justify-center p-4">
-        <div className="relative bg-white dark:bg-card rounded-lg shadow-xl max-w-2xl w-full p-6">
+        <div className="relative bg-white dark:bg-card rounded-2xl shadow-2xl max-w-3xl w-full p-8 border border-gray-200 dark:border-border">
           <button
             onClick={handleClose}
-            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-lg p-1 transition-colors"
             aria-label="Close welcome modal"
           >
-            <svg
-              className="w-6 h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-              aria-hidden="true"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M6 18L18 6M6 6l12 12"
-              />
-            </svg>
+            <X className="w-6 h-6" aria-hidden="true" />
           </button>
 
-          <div className="text-center mb-8">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 mb-4">
+              <Zap className="w-8 h-8 text-white" aria-hidden="true" />
+            </div>
             <h2
               id="welcome-modal-title"
-              className="text-3xl font-bold text-gray-900 dark:text-foreground mb-2"
+              className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent mb-3"
             >
               Welcome to Churn Prediction Platform
             </h2>
-            <p className="text-gray-600 dark:text-gray-400">
-              Get started in 3 simple steps
+            <p className="text-gray-600 dark:text-gray-400 text-lg">
+              {userRole === 'Admin' 
+                ? 'Complete workflow from data to insights' 
+                : 'Work with trained models to generate predictions'}
             </p>
+            <div className="inline-flex items-center gap-2 mt-3 px-4 py-2 bg-blue-50 dark:bg-blue-900/20 rounded-full">
+              <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                Role: {userRole}
+              </span>
+            </div>
           </div>
 
-          <div className="space-y-6 mb-8">
+          <div className="space-y-5 mb-10">
             {steps.map((step, index) => (
               <div
                 key={index}
-                className={`flex items-start space-x-4 p-4 rounded-lg transition-colors ${
+                className={`flex items-start space-x-5 p-5 rounded-xl transition-all duration-300 cursor-pointer ${
                   currentStep === index
-                    ? 'bg-blue-50 dark:bg-blue-900/20 border-2 border-blue-500'
-                    : 'bg-gray-50 dark:bg-muted/50'
+                    ? 'bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 border-2 border-blue-500 shadow-lg scale-105'
+                    : 'bg-gray-50 dark:bg-muted/50 border-2 border-transparent hover:border-gray-300 dark:hover:border-gray-600'
                 }`}
+                onClick={() => setCurrentStep(index)}
               >
                 <div className="flex-shrink-0">
-                  <div className="flex items-center justify-center w-16 h-16 rounded-full bg-white dark:bg-card shadow-md">
-                    {step.icon}
+                  <div className={`flex items-center justify-center w-16 h-16 rounded-xl shadow-md transition-all ${
+                    currentStep === index
+                      ? 'bg-gradient-to-br from-blue-500 to-purple-600 scale-110'
+                      : 'bg-white dark:bg-card'
+                  }`}>
+                    {currentStep === index ? (
+                      <div className="text-white">
+                        {step.icon}
+                      </div>
+                    ) : (
+                      step.icon
+                    )}
                   </div>
                   <div className="text-center mt-2">
-                    <span className="text-sm font-semibold text-gray-600 dark:text-gray-400">
+                    <span className={`text-sm font-bold ${
+                      currentStep === index
+                        ? 'text-blue-600 dark:text-blue-400'
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`}>
                       Step {index + 1}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex-1 pt-2">
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-foreground mb-2">
+                <div className="flex-1 pt-1">
+                  <h3 className={`text-xl font-bold mb-2 ${
+                    currentStep === index
+                      ? 'text-blue-900 dark:text-blue-100'
+                      : 'text-gray-900 dark:text-foreground'
+                  }`}>
                     {step.title}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-400">
+                  <p className={`text-sm leading-relaxed ${
+                    currentStep === index
+                      ? 'text-gray-700 dark:text-gray-300'
+                      : 'text-gray-600 dark:text-gray-400'
+                  }`}>
                     {step.description}
                   </p>
                 </div>
@@ -185,15 +182,15 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             ))}
           </div>
 
-          <div className="flex justify-center space-x-2 mb-6">
+          <div className="flex justify-center space-x-2 mb-8">
             {steps.map((_, index) => (
               <button
                 key={index}
                 onClick={() => setCurrentStep(index)}
-                className={`w-3 h-3 rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                className={`h-2 rounded-full transition-all duration-300 focus:outline-none focus:ring-2 focus:ring-blue-500 ${
                   currentStep === index
-                    ? 'bg-blue-600'
-                    : 'bg-gray-300 dark:bg-muted'
+                    ? 'w-8 bg-gradient-to-r from-blue-600 to-purple-600'
+                    : 'w-2 bg-gray-300 dark:bg-muted hover:bg-gray-400'
                 }`}
                 aria-label={`Go to step ${index + 1}`}
                 aria-current={currentStep === index ? 'step' : undefined}
@@ -201,45 +198,47 @@ export function WelcomeModal({ onClose }: WelcomeModalProps) {
             ))}
           </div>
 
-          <div className="flex justify-between items-center">
-            <div className="flex space-x-3">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-6 border-t border-gray-200 dark:border-border">
+            <div className="flex flex-wrap justify-center sm:justify-start gap-3">
               <button
                 onClick={handleClose}
-                className="px-4 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-primary-foreground focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                className="px-5 py-2.5 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200 font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 Skip for now
               </button>
               <button
                 onClick={handleViewGuide}
-                className="px-4 py-2 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded"
+                className="px-5 py-2.5 text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
-                View Full Guide
+                <span className="inline-flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4" /> View Full Guide
+                </span>
               </button>
             </div>
 
-            <div className="flex space-x-3">
+            <div className="flex gap-3">
               {currentStep > 0 && (
                 <button
                   onClick={() => setCurrentStep(currentStep - 1)}
-                  className="px-4 py-2 border border-gray-300 dark:border-border text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-5 py-2.5 border-2 border-gray-300 dark:border-border text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 inline-flex items-center gap-1"
                 >
-                  Previous
+                  <ChevronLeft className="w-4 h-4" /> Previous
                 </button>
               )}
 
               {currentStep < steps.length - 1 ? (
                 <button
                   onClick={() => setCurrentStep(currentStep + 1)}
-                  className="px-6 py-2 bg-blue-600 text-primary-foreground rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-6 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-semibold shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 inline-flex items-center gap-1"
                 >
-                  Next
+                  Next <ChevronRight className="w-4 h-4" />
                 </button>
               ) : (
                 <button
                   onClick={handleGetStarted}
-                  className="px-6 py-2 bg-blue-600 text-primary-foreground rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-semibold"
+                  className="px-8 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-lg font-bold shadow-lg hover:shadow-xl transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 animate-pulse inline-flex items-center gap-1.5"
                 >
-                  Get Started
+                  <Rocket className="w-4 h-4" /> Get Started
                 </button>
               )}
             </div>

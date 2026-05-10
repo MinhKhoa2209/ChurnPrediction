@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { Eye, EyeOff, Loader2, TrendingDown, Check, X } from 'lucide-react';
+import { Eye, EyeOff, Loader2, TrendingDown, Check, X, UserIcon } from 'lucide-react';
 import { toast } from 'sonner';
 import { register } from '@/lib/auth';
 import { useAuthStore } from '@/lib/store/auth-store';
@@ -11,11 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
-
-type Role = 'Admin' | 'Data_Scientist' | 'Analyst';
 
 function PasswordRule({ met, label }: { met: boolean; label: string }) {
   return (
@@ -30,10 +27,10 @@ export function RegisterForm() {
   const router = useRouter();
   const setAuth = useAuthStore((state) => state.setAuth);
 
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
-  const [role, setRole] = useState<Role>('Analyst');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [error, setError] = useState('');
@@ -58,6 +55,11 @@ export function RegisterForm() {
     e.preventDefault();
     setError('');
 
+    if (!name.trim()) {
+      setError('Please enter your name');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -71,7 +73,7 @@ export function RegisterForm() {
 
     setIsLoading(true);
     try {
-      const response = await register({ email, password, role });
+      const response = await register({ name: name.trim(), email, password });
       setAuth(response.user, response.access_token);
       toast.success('Account created!', { description: 'Welcome to ChurnPredict.' });
       router.push('/dashboard');
@@ -110,6 +112,25 @@ export function RegisterForm() {
                   {error}
                 </div>
               )}
+
+              <div className="space-y-2">
+                <Label htmlFor="name">Full name</Label>
+                <div className="relative">
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    required
+                    placeholder="John Doe"
+                    disabled={isLoading}
+                    autoComplete="name"
+                    autoFocus
+                    className="pl-9"
+                  />
+                  <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="email">Email address</Label>
@@ -173,19 +194,7 @@ export function RegisterForm() {
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="role">Role</Label>
-                <Select value={role} onValueChange={(v: string) => setRole(v as Role)} disabled={isLoading}>
-                  <SelectTrigger id="role">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Analyst">Analyst — View dashboards &amp; predictions</SelectItem>
-                    <SelectItem value="Data_Scientist">Data Scientist — Full ML access</SelectItem>
-                    <SelectItem value="Admin">Admin — Full system access</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+              {/* Role selection removed — all registrations are Analyst */}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Creating account...</> : 'Create Account'}

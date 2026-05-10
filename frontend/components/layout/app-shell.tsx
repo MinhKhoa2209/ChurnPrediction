@@ -32,7 +32,7 @@ export function AppShell({ children }: AppShellProps) {
           {children}
         </main>
       </SidebarInset>
-      <CommandMenu />
+      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
     </SidebarProvider>
   );
 }

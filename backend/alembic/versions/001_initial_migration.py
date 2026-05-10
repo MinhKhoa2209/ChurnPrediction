@@ -1,9 +1,3 @@
-"""Initial migration with all 11 tables
-
-Revision ID: 001
-Revises: 
-Create Date: 2025-01-01 00:00:00.000000
-"""
 
 from typing import Sequence, Union
 
@@ -11,7 +5,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-# revision identifiers, used by Alembic.
+                                        
 revision: str = '001'
 down_revision: Union[str, None] = None
 branch_labels: Union[str, Sequence[str], None] = None
@@ -19,11 +13,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    # Enable PostgreSQL extensions (Requirement 25.2)
     op.execute('CREATE EXTENSION IF NOT EXISTS "uuid-ossp"')
     op.execute('CREATE EXTENSION IF NOT EXISTS "pgcrypto"')
     
-    # Create users table (Requirement 25.3)
+                                           
     op.create_table(
         'users',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -42,7 +35,7 @@ def upgrade() -> None:
     op.create_index('idx_users_email', 'users', ['email'])
     op.create_index('idx_users_role', 'users', ['role'])
     
-    # Create datasets table (Requirement 25.3)
+                                              
     op.create_table(
         'datasets',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -62,7 +55,7 @@ def upgrade() -> None:
     op.create_index('idx_datasets_status', 'datasets', ['status'])
     op.create_index('idx_datasets_uploaded_at', 'datasets', ['uploaded_at'], postgresql_ops={'uploaded_at': 'DESC'})
     
-    # Create customer_records table (Requirement 25.3)
+                                                      
     op.create_table(
         'customer_records',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -95,7 +88,7 @@ def upgrade() -> None:
     op.create_index('idx_customer_records_dataset_id', 'customer_records', ['dataset_id'])
     op.create_index('idx_customer_records_churn', 'customer_records', ['churn'])
     
-    # Create preprocessing_configs table (Requirement 25.3)
+                                                           
     op.create_table(
         'preprocessing_configs',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -110,7 +103,7 @@ def upgrade() -> None:
     )
     op.create_index('idx_preprocessing_configs_dataset_id', 'preprocessing_configs', ['dataset_id'])
     
-    # Create model_versions table (Requirement 25.3)
+                                                    
     op.create_table(
         'model_versions',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -142,7 +135,7 @@ def upgrade() -> None:
     op.create_index('idx_model_versions_status', 'model_versions', ['status'])
     op.create_index('idx_model_versions_trained_at', 'model_versions', ['trained_at'], postgresql_ops={'trained_at': 'DESC'})
     
-    # Create training_jobs table (Requirement 25.3)
+                                                   
     op.create_table(
         'training_jobs',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -169,7 +162,7 @@ def upgrade() -> None:
     op.create_index('idx_training_jobs_status', 'training_jobs', ['status'])
     op.create_index('idx_training_jobs_created_at', 'training_jobs', ['created_at'], postgresql_ops={'created_at': 'DESC'})
     
-    # Create training_progress table (Requirement 25.3)
+                                                       
     op.create_table(
         'training_progress',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -184,7 +177,7 @@ def upgrade() -> None:
     op.create_index('idx_training_progress_job_id', 'training_progress', ['training_job_id'])
     op.create_index('idx_training_progress_recorded_at', 'training_progress', ['recorded_at'])
     
-    # Create predictions table (Requirement 25.3)
+                                                 
     op.create_table(
         'predictions',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -209,7 +202,7 @@ def upgrade() -> None:
     op.create_index('idx_predictions_batch_id', 'predictions', ['batch_id'], postgresql_where=sa.text('batch_id IS NOT NULL'))
     op.create_index('idx_predictions_created_at', 'predictions', ['created_at'], postgresql_ops={'created_at': 'DESC'})
     
-    # Create reports table (Requirement 25.3)
+                                             
     op.create_table(
         'reports',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -226,7 +219,7 @@ def upgrade() -> None:
     op.create_index('idx_reports_user_id', 'reports', ['user_id'])
     op.create_index('idx_reports_generated_at', 'reports', ['generated_at'], postgresql_ops={'generated_at': 'DESC'})
     
-    # Create notifications table (Requirement 25.3)
+                                                   
     op.create_table(
         'notifications',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -246,7 +239,7 @@ def upgrade() -> None:
     op.create_index('idx_notifications_is_read', 'notifications', ['is_read'])
     op.create_index('idx_notifications_created_at', 'notifications', ['created_at'], postgresql_ops={'created_at': 'DESC'})
     
-    # Create audit_logs table (Requirement 25.3)
+                                                
     op.create_table(
         'audit_logs',
         sa.Column('id', postgresql.UUID(as_uuid=True), server_default=sa.text('uuid_generate_v4()'), nullable=False),
@@ -266,7 +259,6 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop tables in reverse order (Requirement 25.3)
     op.drop_index('idx_audit_logs_resource', table_name='audit_logs')
     op.drop_index('idx_audit_logs_created_at', table_name='audit_logs')
     op.drop_index('idx_audit_logs_user_id', table_name='audit_logs')
@@ -319,13 +311,13 @@ def downgrade() -> None:
     op.drop_index('idx_users_email', table_name='users')
     op.drop_table('users')
     
-    # Drop ENUM types
+                     
     op.execute('DROP TYPE IF EXISTS training_job_status')
     op.execute('DROP TYPE IF EXISTS model_status')
     op.execute('DROP TYPE IF EXISTS model_type')
     op.execute('DROP TYPE IF EXISTS dataset_status')
     op.execute('DROP TYPE IF EXISTS user_role')
     
-    # Drop extensions
+                     
     op.execute('DROP EXTENSION IF EXISTS "pgcrypto"')
     op.execute('DROP EXTENSION IF EXISTS "uuid-ossp"')

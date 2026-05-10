@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { GoogleSignInButton } from '@/components/auth/google-signin-button';
 
 export function LoginForm() {
   const router = useRouter();
@@ -30,6 +31,19 @@ export function LoginForm() {
 
     try {
       const response = await login({ email, password });
+      
+      // Check if user is Admin - should not login via user page
+      // Don't expose that this is an admin account for security
+      if (response.user.role === 'Admin') {
+        setError('Invalid email or password');
+        announceToScreenReader('Login failed', 'assertive');
+        toast.error('Sign in failed', { 
+          description: 'Invalid email or password' 
+        });
+        setIsLoading(false);
+        return;
+      }
+      
       setAuth(response.user, response.access_token);
       announceToScreenReader('Login successful. Redirecting to dashboard.', 'polite');
       toast.success('Welcome back!', { description: 'You have signed in successfully.' });
@@ -64,7 +78,7 @@ export function LoginForm() {
             <CardDescription>Enter your credentials to access the platform</CardDescription>
           </CardHeader>
 
-          <CardContent>
+          <CardContent className="space-y-4">
             <form id="login-form" onSubmit={handleSubmit} className="space-y-4" aria-label="Login form">
               {error && (
                 <div
@@ -147,6 +161,18 @@ export function LoginForm() {
                 )}
               </Button>
             </form>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <Separator />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-card px-2 text-muted-foreground">Or continue with Google</span>
+              </div>
+            </div>
+
+            {/* Google Sign In Button */}
+            <GoogleSignInButton />
           </CardContent>
 
           <CardFooter className="flex flex-col gap-4 pt-0">

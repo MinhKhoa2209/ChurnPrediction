@@ -7,7 +7,10 @@
 export interface User {
   id: string;
   email: string;
-  role: 'Admin' | 'Data_Scientist' | 'Analyst';
+  role: 'Admin' | 'Analyst';
+  name: string | null;
+  avatar: string | null;
+  provider: string;
   createdAt: string;
   emailVerified: boolean;
   emailNotificationsEnabled: boolean;
@@ -24,10 +27,19 @@ export interface LoginRequest {
   password: string;
 }
 
-export interface RegisterRequest {
+export interface AdminLoginRequest {
   email: string;
   password: string;
-  role?: 'Data_Scientist' | 'Analyst';
+}
+
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+}
+
+export interface GoogleAuthRequest {
+  credential: string;
 }
 
 // Dataset Types

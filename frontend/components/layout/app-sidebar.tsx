@@ -15,6 +15,8 @@ import {
   ChevronRight,
   LogOut,
   User,
+  Users,
+  Activity,
 } from 'lucide-react';
 import {
   Sidebar,
@@ -52,20 +54,22 @@ interface NavItem {
 }
 
 const mainNavItems: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Getting Started', href: '/getting-started', icon: Rocket, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['Admin', 'Analyst'] },
+  { label: 'Getting Started', href: '/getting-started', icon: Rocket, roles: ['Admin', 'Analyst'] },
 ];
 
 const dataNavItems: NavItem[] = [
-  { label: 'Data Upload', href: '/data/upload', icon: Upload, roles: ['Admin', 'Data_Scientist'] },
-  { label: 'Models', href: '/models', icon: BrainCircuit, roles: ['Admin', 'Data_Scientist'] },
-  { label: 'Predictions', href: '/predictions', icon: Sparkles, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Reports', href: '/reports', icon: FileBarChart2, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
+  { label: 'Data Upload', href: '/data/upload', icon: Upload, roles: ['Admin'] },
+  { label: 'Data Processing', href: '/data/processing', icon: Activity, roles: ['Admin'] },
+  { label: 'Models', href: '/models', icon: BrainCircuit, roles: ['Admin', 'Analyst'] },
+  { label: 'Predictions', href: '/predictions', icon: Sparkles, roles: ['Admin', 'Analyst'] },
+  { label: 'Reports', href: '/reports', icon: FileBarChart2, roles: ['Admin', 'Analyst'] },
 ];
 
 const settingsNavItems: NavItem[] = [
-  { label: 'Notifications', href: '/notifications', icon: Bell, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
-  { label: 'Settings', href: '/settings', icon: Settings, roles: ['Admin', 'Data_Scientist', 'Analyst'] },
+  { label: 'Notifications', href: '/notifications', icon: Bell, roles: ['Admin', 'Analyst'] },
+  { label: 'Users', href: '/admin/users', icon: Users, roles: ['Admin'] },
+  { label: 'Settings', href: '/settings', icon: Settings, roles: ['Admin', 'Analyst'] },
 ];
 
 function NavGroup({ items, label }: { items: NavItem[]; label: string }) {
@@ -129,9 +133,8 @@ export function AppSidebar() {
     announceToScreenReader('You have been logged out', 'polite');
   };
 
-  const initials = user?.email
-    ? user.email.slice(0, 2).toUpperCase()
-    : 'U';
+  const displayName = user?.name || user?.email || 'User';
+  const initials = displayName.slice(0, 2).toUpperCase();
 
   return (
     <Sidebar collapsible="icon" variant="sidebar">
@@ -178,7 +181,7 @@ export function AppSidebar() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">{user?.email}</span>
+                    <span className="truncate font-semibold">{displayName}</span>
                     <span className="truncate text-xs text-muted-foreground">{user?.role}</span>
                   </div>
                   <ChevronRight className="ml-auto size-4" />
@@ -198,8 +201,8 @@ export function AppSidebar() {
                       </AvatarFallback>
                     </Avatar>
                     <div className="grid flex-1 text-left text-sm leading-tight">
-                      <span className="truncate font-semibold">{user?.email}</span>
-                      <span className="truncate text-xs text-muted-foreground">{user?.role}</span>
+                      <span className="truncate font-semibold">{displayName}</span>
+                      <span className="truncate text-xs text-muted-foreground">{user?.email}</span>
                     </div>
                   </div>
                 </DropdownMenuLabel>
