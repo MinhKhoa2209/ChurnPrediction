@@ -25,7 +25,6 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 import { announceToScreenReader } from '@/lib/accessibility';
-import { WelcomeModal } from '@/components/WelcomeModal';
 import { StatCard } from '@/components/shared/stat-card';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -148,8 +147,6 @@ export default function DashboardPage() {
 
   return (
     <>
-      <WelcomeModal />
-
       <PageHeader
         title="Dashboard Analytics"
         description="Overview of customer churn metrics and trends"

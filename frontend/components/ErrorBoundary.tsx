@@ -1,7 +1,6 @@
 'use client';
 
 import React, { Component, ReactNode } from 'react';
-import * as Sentry from '@sentry/nextjs';
 import { AlertTriangle } from 'lucide-react';
 
 interface Props {
@@ -26,13 +25,20 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
-    Sentry.captureException(error, {
-      contexts: {
-        react: {
-          componentStack: errorInfo.componentStack,
-        },
-      },
-    });
+    // Dynamically import Sentry to avoid SSR subscribe crash
+    import('@sentry/nextjs')
+      .then((Sentry) => {
+        Sentry.captureException(error, {
+          contexts: {
+            react: {
+              componentStack: errorInfo.componentStack,
+            },
+          },
+        });
+      })
+      .catch(() => {
+        // Sentry unavailable — silently continue
+      });
 
     if (this.props.onError) {
       this.props.onError(error, errorInfo);

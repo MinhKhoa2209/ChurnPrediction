@@ -26,9 +26,13 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 encryption_service = EncryptionService(settings.encryption_key)
 
 
-@celery_app.task(name="backend.workers.dataset_tasks.process_csv_file")
-def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
+@celery_app.task(name="backend.workers.dataset_tasks.process_csv_file", bind=True)
+def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
     import base64
+    import json
+    from datetime import datetime
+
+    from backend.infrastructure.cache import cache_client
 
     db = SessionLocal()
 
@@ -38,7 +42,34 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
 
         logger.info(f"Processing dataset {dataset_id}")
 
+        # Count total rows first
+        total_rows = sum(1 for _ in csv.DictReader(io.StringIO(text_content)))
+        logger.info(f"Dataset {dataset_id}: Total rows to process: {total_rows}")
+
+        # Reset reader
         csv_reader = csv.DictReader(io.StringIO(text_content))
+
+        # Initialize progress in Redis
+        progress_key = f"dataset:progress:{dataset_id}"
+        start_time = datetime.utcnow()
+        
+        logger.info(f"Initializing progress tracking for dataset {dataset_id}")
+        try:
+            cache_client.set_json(
+                progress_key,
+                {
+                    "status": "processing",
+                    "progress": 0,
+                    "total_records": total_rows,
+                    "processed_records": 0,
+                    "current_step": "Parsing CSV and validating data",
+                    "started_at": start_time.isoformat(),
+                },
+                ttl=3600  # Expire after 1 hour
+            )
+            logger.info(f"Progress initialized in Redis for dataset {dataset_id}")
+        except Exception as e:
+            logger.error(f"Failed to initialize progress in Redis: {e}", exc_info=True)
 
         customer_ids = set()
         duplicate_ids = []
@@ -48,7 +79,7 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
         batch_size = 1000
         batch = []
 
-        for row in csv_reader:
+        for idx, row in enumerate(csv_reader, start=1):
             customer_id = row.get("customerID", "").strip()
 
             if customer_id in customer_ids:
@@ -102,11 +133,48 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
                 records_created += len(batch)
                 batch = []
 
+            # Update progress every 50 records (more frequent for better UX)
+            if idx % 50 == 0 or idx == 1:  # Also update on first record
+                progress_percent = int((idx / total_rows) * 100) if total_rows > 0 else 0
+
+                logger.info(f"Dataset {dataset_id}: Progress {progress_percent}% ({idx}/{total_rows})")
+
+                try:
+                    cache_client.set_json(
+                        progress_key,
+                        {
+                            "status": "processing",
+                            "progress": progress_percent,
+                            "total_records": total_rows,
+                            "processed_records": idx,
+                            "current_step": f"Processing records ({idx}/{total_rows})",
+                            "started_at": start_time.isoformat(),
+                        },
+                        ttl=3600
+                    )
+                    logger.debug(f"Progress updated in Redis for dataset {dataset_id}")
+                except Exception as cache_error:
+                    logger.error(f"Failed to update progress in Redis: {cache_error}")
+
+                # Update Celery task state
+                try:
+                    self.update_state(
+                        state='PROGRESS',
+                        meta={
+                            'current': idx,
+                            'total': total_rows,
+                            'percent': progress_percent
+                        }
+                    )
+                except Exception as celery_error:
+                    logger.error(f"Failed to update Celery state: {celery_error}")
+
         if batch:
             db.bulk_save_objects(batch)
             db.commit()
             records_created += len(batch)
 
+        # Mark as complete or failed based on duplicates
         if duplicate_count > 0:
             max_duplicates_to_report = 10
             duplicate_sample = duplicate_ids[:max_duplicates_to_report]
@@ -122,6 +190,22 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
                 status="failed",
                 validation_errors={"duplicates": error_msg, "duplicate_ids": duplicate_ids},
             )
+
+            # Mark as failed in Redis
+            cache_client.set_json(
+                progress_key,
+                {
+                    "status": "failed",
+                    "progress": 100,
+                    "total_records": total_rows,
+                    "processed_records": records_created,
+                    "current_step": "Failed",
+                    "error": error_msg,
+                    "failed_at": datetime.utcnow().isoformat(),
+                },
+                ttl=3600
+            )
+
             logger.error(f"Dataset {dataset_id} failed: {error_msg}")
             return {
                 "success": False,
@@ -135,7 +219,39 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
             db, UUID(dataset_id), status="ready", data_quality_score=100.0
         )
 
+        # Mark as complete in Redis
+        cache_client.set_json(
+            progress_key,
+            {
+                "status": "completed",
+                "progress": 100,
+                "total_records": total_rows,
+                "processed_records": records_created,
+                "current_step": "Complete",
+                "completed_at": datetime.utcnow().isoformat(),
+            },
+            ttl=3600
+        )
+
         logger.info(f"Successfully processed dataset {dataset_id}: {records_created} records")
+
+        # Create notification for successful processing
+        try:
+            from backend.services.notification_service import NotificationService
+            dataset = DatasetService.get_dataset_by_id(db, UUID(dataset_id))
+            if dataset:
+                notification_service = NotificationService()
+                notification_service.create_dataset_notification(
+                    db=db,
+                    user_id=dataset.user_id,
+                    dataset_id=UUID(dataset_id),
+                    filename=dataset.filename,
+                    status="ready",
+                    record_count=records_created,
+                )
+                logger.info(f"Created completion notification for dataset {dataset_id}")
+        except Exception as notif_error:
+            logger.error(f"Failed to create dataset notification: {notif_error}", exc_info=True)
 
         return {
             "success": True,
@@ -149,6 +265,38 @@ def process_csv_file(dataset_id: str, file_content_base64: str) -> dict:
         DatasetService.update_dataset_status(
             db, UUID(dataset_id), status="failed", validation_errors={"error": str(e)}
         )
+
+        # Mark as failed in Redis
+        from backend.infrastructure.cache import cache_client
+        from datetime import datetime
+
+        progress_key = f"dataset:progress:{dataset_id}"
+        cache_client.set_json(
+            progress_key,
+            {
+                "status": "failed",
+                "error": str(e),
+                "failed_at": datetime.utcnow().isoformat(),
+            },
+            ttl=3600
+        )
+
+        # Create notification for failed processing
+        try:
+            from backend.services.notification_service import NotificationService
+            dataset = DatasetService.get_dataset_by_id(db, UUID(dataset_id))
+            if dataset:
+                notification_service = NotificationService()
+                notification_service.create_dataset_notification(
+                    db=db,
+                    user_id=dataset.user_id,
+                    dataset_id=UUID(dataset_id),
+                    filename=dataset.filename,
+                    status="failed",
+                    failure_reason=str(e),
+                )
+        except Exception as notif_error:
+            logger.error(f"Failed to create failure notification: {notif_error}", exc_info=True)
 
         return {"success": False, "error": str(e)}
 

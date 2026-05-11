@@ -45,3 +45,28 @@ class DatasetListResponse(BaseModel):
     total: int
 
     model_config = {"from_attributes": True}
+
+
+class DatasetProgressResponse(BaseModel):
+    status: str = Field(..., description="Processing status: processing, completed, failed")
+    progress: int = Field(..., description="Progress percentage (0-100)")
+    total_records: int = Field(..., description="Total number of records to process")
+    processed_records: int = Field(..., description="Number of records processed so far")
+    current_step: str = Field(..., description="Current processing step description")
+    started_at: Optional[str] = Field(None, description="Processing start timestamp (ISO format)")
+    completed_at: Optional[str] = Field(None, description="Processing completion timestamp (ISO format)")
+    failed_at: Optional[str] = Field(None, description="Processing failure timestamp (ISO format)")
+    error: Optional[str] = Field(None, description="Error message if processing failed")
+
+    model_config = {
+        "json_schema_extra": {
+            "example": {
+                "status": "processing",
+                "progress": 67,
+                "total_records": 10000,
+                "processed_records": 6700,
+                "current_step": "Processing records (6700/10000)",
+                "started_at": "2024-01-15T10:30:00Z",
+            }
+        }
+    }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useDatasetStore, Dataset } from '@/lib/store/dataset-store';
 import { FileUpload } from '@/components/data';
+import { DatasetProgressTracker } from '@/components/data/DatasetProgressTracker';
 import { api } from '@/lib/api';
 
 export default function DataUploadPage() {
@@ -24,6 +25,8 @@ export default function DataUploadPage() {
   } = useDatasetStore();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [showProgress, setShowProgress] = useState(false);
+  const [processingDatasetId, setProcessingDatasetId] = useState<string | null>(null);
 
   const handleFileSelect = (file: File) => {
     setSelectedFile(file);
@@ -38,7 +41,9 @@ export default function DataUploadPage() {
       setUploadError(null);
       setUploadProgress(0);
 
-    const response = await api.upload<Dataset>(
+      console.log(`[Upload] Starting upload: ${selectedFile.name} (${(selectedFile.size / 1024).toFixed(1)} KB)`);
+
+      const response = await api.upload<Dataset>(
         '/datasets/upload',
         selectedFile,
         token,
@@ -47,17 +52,22 @@ export default function DataUploadPage() {
         }
       );
 
-    addDataset(response);
-    setCurrentDataset(response);
+      console.log(`[Upload] Upload response:`, { id: response.id, status: response.status, filename: response.filename });
 
-    setSelectedFile(null);
-    setUploadProgress(100);
+      addDataset(response);
+      setCurrentDataset(response);
 
-    setTimeout(() => {
-      resetUpload();
-    }, 2000);
+      // Show progress tracker after upload completes
+      setProcessingDatasetId(response.id);
+      setShowProgress(true);
+      setSelectedFile(null);
+      setUploadProgress(100);
+      setUploading(false);
+      
+      console.log(`[Upload] Now tracking processing for dataset: ${response.id}`);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
+      console.error(`[Upload] Upload failed:`, error);
       setUploadError(errorMessage);
       setUploading(false);
     }
@@ -65,6 +75,8 @@ export default function DataUploadPage() {
 
   const handleCancel = () => {
     setSelectedFile(null);
+    setShowProgress(false);
+    setProcessingDatasetId(null);
     resetUpload();
   };
 
@@ -238,7 +250,7 @@ export default function DataUploadPage() {
                 </div>
               )}
 
-              {currentDataset && !isUploading && !uploadError && uploadProgress === 100 && (
+              {currentDataset && !isUploading && !uploadError && uploadProgress === 100 && !showProgress && (
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-4">
                   <div className="flex">
                     <div className="flex-shrink-0">
@@ -279,17 +291,38 @@ export default function DataUploadPage() {
                 </div>
               )}
 
+              {/* Progress Tracker */}
+              {showProgress && processingDatasetId && token && (
+                <DatasetProgressTracker
+                  datasetId={processingDatasetId}
+                  token={token}
+                  onComplete={() => {
+                    setShowProgress(false);
+                    setUploadError(null);
+                    // Show success message briefly before redirect
+                    setTimeout(() => {
+                      router.push(`/data/eda/${processingDatasetId}`);
+                    }, 1500);
+                  }}
+                  onError={(error) => {
+                    setUploadError(`Processing failed: ${error}`);
+                    setShowProgress(false);
+                    setProcessingDatasetId(null);
+                  }}
+                />
+              )}
+
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={handleCancel}
-                  disabled={isUploading}
+                  disabled={isUploading || showProgress}
                   className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-muted border border-gray-300 dark:border-border rounded-md hover:bg-gray-50 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleUpload}
-                  disabled={!selectedFile || isUploading}
+                  disabled={!selectedFile || isUploading || showProgress}
                   className="px-4 py-2 text-sm font-medium text-primary-foreground bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isUploading ? 'Uploading...' : 'Upload Dataset'}

@@ -11,7 +11,7 @@ from backend.api.dependencies import (
 )
 from backend.domain.models.dataset import Dataset
 from backend.domain.schemas.auth import UserResponse
-from backend.domain.schemas.dataset import DatasetUploadResponse
+from backend.domain.schemas.dataset import DatasetUploadResponse, DatasetProgressResponse
 from backend.infrastructure.database import get_db
 from backend.services.dataset_service import DatasetService
 from backend.workers.dataset_tasks import process_csv_file
@@ -96,6 +96,113 @@ async def upload_dataset(
 
 
 @router.get(
+    "/{dataset_id}/progress",
+    response_model=DatasetProgressResponse,
+    responses={
+        200: {"description": "Dataset processing progress"},
+        404: {"description": "Dataset not found"},
+        403: {"description": "Access denied"},
+    },
+)
+async def get_dataset_progress(
+    dataset_id: str,
+    current_user: Annotated[UserResponse, Depends(require_any_authenticated_user)],
+    db: Session = Depends(get_db),
+):
+    """Get real-time processing progress for a dataset"""
+    from uuid import UUID
+    import json
+
+    try:
+        dataset_uuid = UUID(dataset_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid dataset ID format"
+        )
+
+    # Check dataset exists and user has access
+    dataset = db.query(Dataset).filter(Dataset.id == dataset_uuid).first()
+    if not dataset:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Dataset not found"
+        )
+
+    # Check permissions
+    from uuid import UUID as UUIDType
+    current_user_uuid = UUIDType(current_user.id) if isinstance(current_user.id, str) else current_user.id
+    
+    if current_user.role != "Admin" and dataset.user_id != current_user_uuid:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access denied"
+        )
+
+    # Get progress from Redis
+    try:
+        from backend.infrastructure.cache import cache_client
+        
+        progress_key = f"dataset:progress:{dataset_id}"
+        logger.info(f"Fetching progress for dataset {dataset_id} from Redis key: {progress_key}")
+        
+        progress = cache_client.get_json(progress_key)
+
+        if progress:
+            logger.info(f"Progress found for dataset {dataset_id}: {progress}")
+            return DatasetProgressResponse(**progress)
+        else:
+            logger.info(f"No progress data found in Redis for dataset {dataset_id}")
+    except Exception as e:
+        logger.error(f"Failed to fetch progress from Redis for dataset {dataset_id}: {e}", exc_info=True)
+        # Fall through to default response
+
+    # No progress data in Redis - fall back to DB status
+    logger.info(f"Returning fallback progress for dataset {dataset_id}, DB status: {dataset.status}")
+    
+    # Map DB statuses to the status names the frontend expects
+    # DB uses 'ready' but frontend expects 'completed'
+    if dataset.status == "processing":
+        return DatasetProgressResponse(
+            status="processing",
+            progress=0,
+            total_records=dataset.record_count or 0,
+            processed_records=0,
+            current_step="Initializing...",
+        )
+    
+    if dataset.status == "ready":
+        return DatasetProgressResponse(
+            status="completed",
+            progress=100,
+            total_records=dataset.record_count or 0,
+            processed_records=dataset.record_count or 0,
+            current_step="Complete",
+        )
+    
+    if dataset.status == "failed":
+        error_msg = None
+        if dataset.validation_errors and isinstance(dataset.validation_errors, dict):
+            error_msg = dataset.validation_errors.get("error") or dataset.validation_errors.get("duplicates")
+        return DatasetProgressResponse(
+            status="failed",
+            progress=100,
+            total_records=dataset.record_count or 0,
+            processed_records=0,
+            current_step="Failed",
+            error=error_msg or "Processing failed",
+        )
+    
+    return DatasetProgressResponse(
+        status=dataset.status,
+        progress=0,
+        total_records=dataset.record_count or 0,
+        processed_records=0,
+        current_step=dataset.status.capitalize() if dataset.status else "Unknown",
+    )
+
+
+@router.get(
     "",
     response_model=dict,
     responses={
@@ -143,7 +250,7 @@ async def get_dataset(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and dataset.user_id != current_user.id:
+    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     from backend.domain.schemas.dataset import DatasetResponse
@@ -177,7 +284,7 @@ async def delete_dataset(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and dataset.user_id != current_user.id:
+    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     db.delete(dataset)
@@ -231,7 +338,7 @@ async def get_dataset_records(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and dataset.user_id != current_user.id:
+    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     total_count = db.query(CustomerRecord).filter(CustomerRecord.dataset_id == dataset_uuid).count()
@@ -315,7 +422,7 @@ async def get_dataset_quality(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and dataset.user_id != current_user.id:
+    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     try:
@@ -355,7 +462,7 @@ async def get_dataset_statistics(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and dataset.user_id != current_user.id:
+    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     records = db.query(CustomerRecord).filter(CustomerRecord.dataset_id == dataset_uuid).all()

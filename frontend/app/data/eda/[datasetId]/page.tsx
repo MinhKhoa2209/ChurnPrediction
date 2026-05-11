@@ -1,8 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
+import {
+  useEDAStore,
+  type CorrelationData,
+  type DistributionsData,
+  type ChurnByContractData,
+  type ChurnByInternetData,
+  type ScatterPlotData,
+  type FeatureDistribution,
+} from '@/lib/store/eda-store';
 import { api } from '@/lib/api';
 import {
   BarChart,
@@ -17,89 +26,9 @@ import {
   ResponsiveContainer,
 } from 'recharts';
 
-interface CorrelationData {
-  datasetId: string;
-  features: string[];
-  correlationMatrix: number[][];
-  recordCount: number;
-}
-
-interface FeatureDistribution {
-  bins: number[];
-  frequencies: number[];
-  min: number;
-  max: number;
-  mean: number;
-  median: number;
-}
-
 interface HistogramBin {
   bin: string;
   frequency: number;
-}
-
-interface DistributionsData {
-  datasetId: string;
-  distributions: {
-    tenure: FeatureDistribution;
-    MonthlyCharges: FeatureDistribution;
-    TotalCharges: FeatureDistribution;
-  };
-  recordCount: number;
-}
-
-interface ChurnRateItem {
-  contractType?: string;
-  internetServiceType?: string;
-  churnRate: number;
-  totalCustomers: number;
-  churnedCustomers: number;
-}
-
-interface ChurnByContractData {
-  datasetId: string;
-  churnRates: ChurnRateItem[];
-  recordCount: number;
-}
-
-interface ChurnByInternetData {
-  datasetId: string;
-  churnRates: ChurnRateItem[];
-  recordCount: number;
-}
-
-interface ScatterDataPoint {
-  monthlyCharges: number;
-  totalCharges: number;
-  churn: boolean;
-}
-
-interface ScatterPlotData {
-  datasetId: string;
-  scatterData: ScatterDataPoint[];
-  recordCount: number;
-}
-
-interface PCADataPoint2D {
-  pc1: number;
-  pc2: number;
-  churn: boolean;
-}
-
-interface PCADataPoint3D {
-  pc1: number;
-  pc2: number;
-  pc3: number;
-  churn: boolean;
-}
-
-interface PCAData {
-  datasetId: string;
-  pca2d: PCADataPoint2D[];
-  pca3d: PCADataPoint3D[];
-  explainedVariance2d: number[];
-  explainedVariance3d: number[];
-  recordCount: number;
 }
 
 export default function EDAPage() {
@@ -108,96 +37,173 @@ export default function EDAPage() {
   const datasetId = params.datasetId as string;
   const { user, token, isLoading: authLoading } = useAuthStore();
 
-  const [correlationData, setCorrelationData] = useState<CorrelationData | null>(null);
-  const [distributionsData, setDistributionsData] = useState<DistributionsData | null>(null);
-  const [churnByContractData, setChurnByContractData] = useState<ChurnByContractData | null>(null);
-  const [churnByInternetData, setChurnByInternetData] = useState<ChurnByInternetData | null>(null);
-  const [scatterData, setScatterData] = useState<ScatterPlotData | null>(null);
-  const [pcaData, setPcaData] = useState<PCAData | null>(null);
+  // EDA store for caching
+  const {
+    getCachedData,
+    setCachedData,
+    isCacheValid,
+    setLoading: setStoreLoading,
+    isLoading: isStoreLoading,
+  } = useEDAStore();
 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isNotReady, setIsNotReady] = useState(false);
   const [loadingProgress, setLoadingProgress] = useState(0);
 
+  // Guard against StrictMode double-fetch and duplicate calls
+  const fetchStarted = useRef(false);
+
+  // Read cached data (these are derived, not state)
+  const cached = getCachedData(datasetId);
+  const correlationData = cached?.correlationData ?? null;
+  const distributionsData = cached?.distributionsData ?? null;
+  const churnByContractData = cached?.churnByContractData ?? null;
+  const churnByInternetData = cached?.churnByInternetData ?? null;
+  const scatterData = cached?.scatterData ?? null;
+
   const fetchAllEDAData = useCallback(async () => {
+    // Skip if already loading or cache is valid
+    if (isStoreLoading(datasetId)) {
+      console.log(`[EDA] Already loading dataset ${datasetId}, skipping`);
+      return;
+    }
+
+    if (isCacheValid(datasetId)) {
+      console.log(`[EDA] Using cached data for dataset ${datasetId}`);
+      setIsLoading(false);
+      setLoadingProgress(100);
+      return;
+    }
+
     try {
       setIsLoading(true);
+      setStoreLoading(datasetId, true);
       setError(null);
+      setIsNotReady(false);
       setLoadingProgress(0);
 
+      console.log(`[EDA] Fetching EDA data for dataset ${datasetId}...`);
       const startTime = Date.now();
 
-      const [correlation, distributions, churnContract, churnInternet, scatter, pca] = await Promise.all([
+      // 5 parallel API calls (PCA removed)
+      const [correlation, distributions, churnContract, churnInternet, scatter] = await Promise.all([
         api.get<CorrelationData>(`/eda/${datasetId}/correlation`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
+          setLoadingProgress(prev => prev + 20);
           return data;
         }),
         api.get<DistributionsData>(`/eda/${datasetId}/distributions?bins=10`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
+          setLoadingProgress(prev => prev + 20);
           return data;
         }),
         api.get<ChurnByContractData>(`/eda/${datasetId}/churn-by-contract`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
+          setLoadingProgress(prev => prev + 20);
           return data;
         }),
         api.get<ChurnByInternetData>(`/eda/${datasetId}/churn-by-internet`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
+          setLoadingProgress(prev => prev + 20);
           return data;
         }),
         api.get<ScatterPlotData>(`/eda/${datasetId}/scatter`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
-          return data;
-        }),
-        api.get<PCAData>(`/eda/${datasetId}/pca`, token!).then(data => {
-          setLoadingProgress(prev => prev + 16.67);
+          setLoadingProgress(prev => prev + 20);
           return data;
         }),
       ]);
 
-      const endTime = Date.now();
-      const loadTime = (endTime - startTime) / 1000;
+      const loadTime = ((Date.now() - startTime) / 1000).toFixed(2);
+      console.log(`[EDA] All data loaded in ${loadTime}s — ${correlation?.recordCount} records`);
 
-      console.log(`EDA data loaded in ${loadTime.toFixed(2)} seconds`);
+      // Cache in Zustand store (survives unmount)
+      setCachedData(datasetId, {
+        correlationData: correlation,
+        distributionsData: distributions,
+        churnByContractData: churnContract,
+        churnByInternetData: churnInternet,
+        scatterData: scatter,
+      });
 
-      setCorrelationData(correlation);
-      setDistributionsData(distributions);
-      setChurnByContractData(churnContract);
-      setChurnByInternetData(churnInternet);
-      setScatterData(scatter);
-      setPcaData(pca);
       setLoadingProgress(100);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load EDA data';
-      setError(errorMessage);
+      console.error(`[EDA] Error:`, err);
+
+      if (errorMessage.toLowerCase().includes('not ready') || errorMessage.toLowerCase().includes('processing')) {
+        setIsNotReady(true);
+        setError('Dataset is still being processed. Please wait for processing to complete before viewing EDA.');
+      } else {
+        setError(errorMessage);
+      }
     } finally {
       setIsLoading(false);
+      setStoreLoading(datasetId, false);
     }
-  }, [datasetId, token]);
+  }, [datasetId, token, isCacheValid, isStoreLoading, setCachedData, setStoreLoading]);
 
   useEffect(() => {
-    if (!authLoading && token && datasetId) {
+    if (!authLoading && token && datasetId && !fetchStarted.current) {
+      fetchStarted.current = true;
       queueMicrotask(() => {
         void fetchAllEDAData();
       });
     }
   }, [authLoading, token, datasetId, fetchAllEDAData]);
 
-  const handleBackToDashboard = () => {
-    router.push('/dashboard');
-  };
+  // ── Memoized chart data transforms ──────────────────────────────
 
-  const prepareHistogramData = (distribution: FeatureDistribution) => {
+  const prepareHistogramData = useCallback((distribution: FeatureDistribution): HistogramBin[] => {
     const data: HistogramBin[] = [];
     for (let i = 0; i < distribution.frequencies.length; i++) {
       const binStart = distribution.bins[i];
       const binEnd = distribution.bins[i + 1];
-      const binLabel = `${binStart.toFixed(0)}-${binEnd.toFixed(0)}`;
       data.push({
-        bin: binLabel,
+        bin: `${binStart.toFixed(0)}-${binEnd.toFixed(0)}`,
         frequency: distribution.frequencies[i],
       });
     }
     return data;
+  }, []);
+
+  const tenureHistogram = useMemo(
+    () => distributionsData ? prepareHistogramData(distributionsData.distributions.tenure) : [],
+    [distributionsData, prepareHistogramData]
+  );
+
+  const monthlyChargesHistogram = useMemo(
+    () => distributionsData ? prepareHistogramData(distributionsData.distributions.MonthlyCharges) : [],
+    [distributionsData, prepareHistogramData]
+  );
+
+  const totalChargesHistogram = useMemo(
+    () => distributionsData ? prepareHistogramData(distributionsData.distributions.TotalCharges) : [],
+    [distributionsData, prepareHistogramData]
+  );
+
+  const scatterNoChurn = useMemo(
+    () => scatterData?.scatterData.filter(d => !d.churn) ?? [],
+    [scatterData]
+  );
+
+  const scatterChurned = useMemo(
+    () => scatterData?.scatterData.filter(d => d.churn) ?? [],
+    [scatterData]
+  );
+
+  // ── Churn distribution summary ──────────────────────────────────
+
+  const churnSummary = useMemo(() => {
+    if (!churnByContractData) return null;
+    const totalCustomers = churnByContractData.churnRates.reduce((a, b) => a + b.totalCustomers, 0);
+    const totalChurned = churnByContractData.churnRates.reduce((a, b) => a + b.churnedCustomers, 0);
+    return {
+      totalCustomers,
+      totalChurned,
+      totalRetained: totalCustomers - totalChurned,
+      overallChurnRate: totalCustomers > 0 ? totalChurned / totalCustomers : 0,
+    };
+  }, [churnByContractData]);
+
+  const handleBackToDashboard = () => {
+    router.push('/dashboard');
   };
 
   const getCorrelationColor = (value: number): string => {
@@ -208,7 +214,9 @@ export default function EDAPage() {
     return '#ef4444';
   };
 
-  if (authLoading || isLoading) {
+  // ── Render states ───────────────────────────────────────────────
+
+  if (authLoading || (isLoading && !cached)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 dark:bg-background">
         <div className="text-gray-900 dark:text-foreground mb-4">Loading EDA visualizations...</div>
@@ -254,12 +262,43 @@ export default function EDAPage() {
 
         <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
           <div className="px-4 py-6 sm:px-0">
-            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
-              <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
-                Error Loading EDA Data
-              </h2>
-              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
-            </div>
+            {isNotReady ? (
+              <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-2">
+                  Dataset Still Processing
+                </h2>
+                <p className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+                  {error}
+                </p>
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => router.push('/data/processing')}
+                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium"
+                  >
+                    View Processing Status
+                  </button>
+                  <button
+                    onClick={() => { fetchStarted.current = false; setError(null); void fetchAllEDAData(); }}
+                    className="px-4 py-2 border border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-300 rounded-md text-sm font-medium hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                  >
+                    Retry
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-6">
+                <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                  Error Loading EDA Data
+                </h2>
+                <p className="text-sm text-red-700 dark:text-red-300 mb-4">{error}</p>
+                <button
+                  onClick={() => { fetchStarted.current = false; setError(null); void fetchAllEDAData(); }}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-md text-sm font-medium"
+                >
+                  Retry
+                </button>
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -288,18 +327,46 @@ export default function EDAPage() {
 
       <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
         <div className="px-4 py-6 sm:px-0 space-y-6">
-          <div className="bg-white dark:bg-card shadow rounded-lg p-6">
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-2">
-              Dataset Overview
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Dataset ID: <span className="font-mono">{datasetId}</span>
-            </p>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Total Records: <span className="font-semibold">{correlationData?.recordCount || 0}</span>
-            </p>
+
+          {/* Dataset Overview + Churn Summary */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground mb-2">
+                Dataset Overview
+              </h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Dataset ID: <span className="font-mono">{datasetId}</span>
+              </p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Total Records: <span className="font-semibold">{correlationData?.recordCount || 0}</span>
+              </p>
+            </div>
+
+            {churnSummary && (
+              <>
+                <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Churn Rate</h3>
+                  <p className="text-3xl font-bold text-red-600 dark:text-red-400">
+                    {(churnSummary.overallChurnRate * 100).toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {churnSummary.totalChurned.toLocaleString()} of {churnSummary.totalCustomers.toLocaleString()} customers
+                  </p>
+                </div>
+                <div className="bg-white dark:bg-card shadow rounded-lg p-6">
+                  <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Retained</h3>
+                  <p className="text-3xl font-bold text-green-600 dark:text-green-400">
+                    {(((1 - churnSummary.overallChurnRate) * 100)).toFixed(1)}%
+                  </p>
+                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                    {churnSummary.totalRetained.toLocaleString()} customers retained
+                  </p>
+                </div>
+              </>
+            )}
           </div>
 
+          {/* Correlation Heatmap */}
           {correlationData && (
             <div className="bg-white dark:bg-card shadow rounded-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
@@ -353,6 +420,7 @@ export default function EDAPage() {
             </div>
           )}
 
+          {/* Feature Distributions */}
           {distributionsData && (
             <div className="bg-white dark:bg-card shadow rounded-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
@@ -368,7 +436,7 @@ export default function EDAPage() {
                     Median: {distributionsData.distributions.tenure.median.toFixed(2)}
                   </p>
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={prepareHistogramData(distributionsData.distributions.tenure)}>
+                    <BarChart data={tenureHistogram}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="bin" stroke="#9ca3af" tick={{ fontSize: 10 }} />
                       <YAxis stroke="#9ca3af" tick={{ fontSize: 10 }} />
@@ -393,7 +461,7 @@ export default function EDAPage() {
                     Median: ${distributionsData.distributions.MonthlyCharges.median.toFixed(2)}
                   </p>
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={prepareHistogramData(distributionsData.distributions.MonthlyCharges)}>
+                    <BarChart data={monthlyChargesHistogram}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="bin" stroke="#9ca3af" tick={{ fontSize: 10 }} />
                       <YAxis stroke="#9ca3af" tick={{ fontSize: 10 }} />
@@ -418,7 +486,7 @@ export default function EDAPage() {
                     Median: ${distributionsData.distributions.TotalCharges.median.toFixed(2)}
                   </p>
                   <ResponsiveContainer width="100%" height={200}>
-                    <BarChart data={prepareHistogramData(distributionsData.distributions.TotalCharges)}>
+                    <BarChart data={totalChargesHistogram}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
                       <XAxis dataKey="bin" stroke="#9ca3af" tick={{ fontSize: 10 }} />
                       <YAxis stroke="#9ca3af" tick={{ fontSize: 10 }} />
@@ -437,6 +505,7 @@ export default function EDAPage() {
             </div>
           )}
 
+          {/* Churn Analysis */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {churnByContractData && (
               <div className="bg-white dark:bg-card shadow rounded-lg p-6">
@@ -487,6 +556,7 @@ export default function EDAPage() {
             )}
           </div>
 
+          {/* Scatter Plot */}
           {scatterData && (
             <div className="bg-white dark:bg-card shadow rounded-lg p-6">
               <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-6">
@@ -520,121 +590,18 @@ export default function EDAPage() {
                   <Legend />
                   <Scatter
                     name="No Churn"
-                    data={scatterData.scatterData.filter(d => !d.churn)}
+                    data={scatterNoChurn}
                     fill="#10b981"
                     fillOpacity={0.6}
                   />
                   <Scatter
                     name="Churned"
-                    data={scatterData.scatterData.filter(d => d.churn)}
+                    data={scatterChurned}
                     fill="#ef4444"
                     fillOpacity={0.6}
                   />
                 </ScatterChart>
               </ResponsiveContainer>
-            </div>
-          )}
-
-          {pcaData && (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-2">
-                  2D PCA Visualization
-                </h2>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                  Explained Variance: PC1 {(pcaData.explainedVariance2d[0] * 100).toFixed(2)}%, 
-                  PC2 {(pcaData.explainedVariance2d[1] * 100).toFixed(2)}%
-                </p>
-                <ResponsiveContainer width="100%" height={350}>
-                  <ScatterChart>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis
-                      type="number"
-                      dataKey="pc1"
-                      name="PC1"
-                      stroke="#9ca3af"
-                      label={{ value: 'Principal Component 1', position: 'insideBottom', offset: -5 }}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="pc2"
-                      name="PC2"
-                      stroke="#9ca3af"
-                      label={{ value: 'Principal Component 2', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '0.5rem',
-                      }}
-                    />
-                    <Legend />
-                    <Scatter
-                      name="No Churn"
-                      data={pcaData.pca2d.filter(d => !d.churn)}
-                      fill="#10b981"
-                      fillOpacity={0.6}
-                    />
-                    <Scatter
-                      name="Churned"
-                      data={pcaData.pca2d.filter(d => d.churn)}
-                      fill="#ef4444"
-                      fillOpacity={0.6}
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white dark:bg-card shadow rounded-lg p-6">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-foreground mb-2">
-                  3D PCA Visualization (PC1 vs PC3)
-                </h2>
-                <p className="text-xs text-gray-600 dark:text-gray-400 mb-4">
-                  Explained Variance: PC1 {(pcaData.explainedVariance3d[0] * 100).toFixed(2)}%, 
-                  PC2 {(pcaData.explainedVariance3d[1] * 100).toFixed(2)}%, 
-                  PC3 {(pcaData.explainedVariance3d[2] * 100).toFixed(2)}%
-                </p>
-                <ResponsiveContainer width="100%" height={350}>
-                  <ScatterChart>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
-                    <XAxis
-                      type="number"
-                      dataKey="pc1"
-                      name="PC1"
-                      stroke="#9ca3af"
-                      label={{ value: 'Principal Component 1', position: 'insideBottom', offset: -5 }}
-                    />
-                    <YAxis
-                      type="number"
-                      dataKey="pc3"
-                      name="PC3"
-                      stroke="#9ca3af"
-                      label={{ value: 'Principal Component 3', angle: -90, position: 'insideLeft' }}
-                    />
-                    <Tooltip
-                      contentStyle={{
-                        backgroundColor: '#1f2937',
-                        border: '1px solid #374151',
-                        borderRadius: '0.5rem',
-                      }}
-                    />
-                    <Legend />
-                    <Scatter
-                      name="No Churn"
-                      data={pcaData.pca3d.filter(d => !d.churn)}
-                      fill="#10b981"
-                      fillOpacity={0.6}
-                    />
-                    <Scatter
-                      name="Churned"
-                      data={pcaData.pca3d.filter(d => d.churn)}
-                      fill="#ef4444"
-                      fillOpacity={0.6}
-                    />
-                  </ScatterChart>
-                </ResponsiveContainer>
-              </div>
             </div>
           )}
         </div>

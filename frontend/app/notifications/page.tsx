@@ -9,7 +9,7 @@ import {
   markAllAsRead,
   type Notification,
 } from '@/lib/notifications';
-import { CheckCircle, XCircle, Info, BellOff } from 'lucide-react';
+import { CheckCircle, XCircle, Info, BellOff, Database } from 'lucide-react';
 
 export default function NotificationsPage() {
   const router = useRouter();
@@ -90,17 +90,28 @@ export default function NotificationsPage() {
   };
 
   const getNotificationIcon = (type: string) => {
-    if (type === 'training_completed') {
+    if (type === 'training_completed' || type === 'dataset_completed') {
       return (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-          <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+          {type.startsWith('dataset') ? (
+            <Database className="w-6 h-6 text-green-600 dark:text-green-400" />
+          ) : (
+            <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+          )}
         </div>
       );
     }
-    if (type === 'training_failed') {
+    if (type === 'training_failed' || type === 'dataset_failed') {
       return (
         <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
           <XCircle className="w-6 h-6 text-red-600 dark:text-red-400" />
+        </div>
+      );
+    }
+    if (type === 'dataset_uploaded') {
+      return (
+        <div className="flex-shrink-0 w-10 h-10 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+          <Database className="w-6 h-6 text-purple-600 dark:text-purple-400" />
         </div>
       );
     }

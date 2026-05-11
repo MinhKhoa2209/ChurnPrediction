@@ -113,4 +113,4 @@ class UpdateSettingsRequest(BaseModel):
         None, description="Whether to enable email notifications for training job completion"
     )
     name: Optional[str] = Field(None, min_length=1, max_length=255, description="User's full name")
-    avatar: Optional[str] = Field(None, max_length=500, description="User's avatar URL")
+    avatar: Optional[str] = Field(None, max_length=500000, description="User's avatar URL or base64 data")

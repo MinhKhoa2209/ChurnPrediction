@@ -28,8 +28,9 @@ celery_app.conf.update(
 )
 
 
-celery_app.conf.task_routes = {
-    "backend.workers.dataset_tasks.*": {"queue": "datasets"},
-    "backend.workers.training_tasks.*": {"queue": "training"},
-    "backend.workers.prediction_tasks.*": {"queue": "predictions"},
-}
+# Task routes - commented out to use default queue
+# celery_app.conf.task_routes = {
+#     "backend.workers.dataset_tasks.*": {"queue": "datasets"},
+#     "backend.workers.training_tasks.*": {"queue": "training"},
+#     "backend.workers.prediction_tasks.*": {"queue": "predictions"},
+# }

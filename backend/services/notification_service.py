@@ -40,11 +40,10 @@ class NotificationService:
             notification = Notification(
                 id=uuid4(),
                 user_id=user_id,
+                training_job_id=training_job_id,
                 title=title,
                 message=message,
                 notification_type=notification_type,
-                related_entity_type="training_job",
-                related_entity_id=training_job_id,
                 is_read=False,
                 created_at=datetime.utcnow(),
             )
@@ -66,6 +65,58 @@ class NotificationService:
 
         except Exception as e:
             logger.error(f"Error creating notification: {e}", exc_info=True)
+            db.rollback()
+            raise
+
+    def create_dataset_notification(
+        self,
+        db: Session,
+        user_id: UUID,
+        dataset_id: UUID,
+        filename: str,
+        status: str,
+        record_count: int = 0,
+        failure_reason: Optional[str] = None,
+    ) -> Notification:
+        try:
+            if status == "ready":
+                title = "Dataset Processing Complete"
+                message = f"Your dataset '{filename}' ({record_count} records) has been processed successfully."
+                notification_type = "dataset_completed"
+            elif status == "failed":
+                title = "Dataset Processing Failed"
+                message = f"Your dataset '{filename}' failed to process."
+                if failure_reason:
+                    message += f" Reason: {failure_reason}"
+                notification_type = "dataset_failed"
+            else:
+                title = "Dataset Uploaded"
+                message = f"Your dataset '{filename}' has been uploaded and is being processed."
+                notification_type = "dataset_uploaded"
+
+            notification = Notification(
+                id=uuid4(),
+                user_id=user_id,
+                title=title,
+                message=message,
+                notification_type=notification_type,
+                is_read=False,
+                created_at=datetime.utcnow(),
+            )
+
+            db.add(notification)
+            db.commit()
+            db.refresh(notification)
+
+            logger.info(
+                f"Created dataset notification {notification.id} for user {user_id}: "
+                f"{notification_type}"
+            )
+
+            return notification
+
+        except Exception as e:
+            logger.error(f"Error creating dataset notification: {e}", exc_info=True)
             db.rollback()
             raise
 

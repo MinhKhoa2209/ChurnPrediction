@@ -88,8 +88,10 @@ async def get_correlation_matrix(
     db: Session = Depends(get_db),
 ) -> CorrelationResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_correlation_matrix(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id)
+            db=db, dataset_id=dataset_id, user_id=user_id, is_admin=is_admin
         )
 
         logger.info(f"User {current_user.id} retrieved correlation matrix for dataset {dataset_id}")
@@ -141,8 +143,10 @@ async def get_distributions(
     db: Session = Depends(get_db),
 ) -> DistributionsResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_distributions(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id), bins=bins
+            db=db, dataset_id=dataset_id, user_id=user_id, bins=bins, is_admin=is_admin
         )
 
         logger.info(
@@ -193,8 +197,10 @@ async def get_churn_by_contract(
     db: Session = Depends(get_db),
 ) -> ChurnByContractResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_churn_by_contract(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id)
+            db=db, dataset_id=dataset_id, user_id=user_id, is_admin=is_admin
         )
 
         logger.info(f"User {current_user.id} retrieved churn by contract for dataset {dataset_id}")
@@ -245,8 +251,10 @@ async def get_churn_by_internet_service(
     db: Session = Depends(get_db),
 ) -> ChurnByInternetResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_churn_by_internet_service(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id)
+            db=db, dataset_id=dataset_id, user_id=user_id, is_admin=is_admin
         )
 
         logger.info(
@@ -313,8 +321,10 @@ async def get_scatter_plot(
     db: Session = Depends(get_db),
 ) -> ScatterPlotResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_scatter_plot(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id)
+            db=db, dataset_id=dataset_id, user_id=user_id, is_admin=is_admin
         )
 
         logger.info(f"User {current_user.id} retrieved scatter plot data for dataset {dataset_id}")
@@ -395,8 +405,10 @@ async def get_pca_visualization(
     db: Session = Depends(get_db),
 ) -> PCAVisualizationResponse:
     try:
+        user_id = current_user.id if isinstance(current_user.id, UUID) else UUID(current_user.id)
+        is_admin = current_user.role == "Admin"
         result = EDAService.get_pca_visualization(
-            db=db, dataset_id=dataset_id, user_id=UUID(current_user.id)
+            db=db, dataset_id=dataset_id, user_id=user_id, is_admin=is_admin
         )
 
         logger.info(f"User {current_user.id} retrieved PCA visualization for dataset {dataset_id}")

@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -33,6 +34,8 @@ from backend.workers.training_tasks import train_model_task
 
 router = APIRouter(prefix="/models", tags=["Models"])
 
+logger = logging.getLogger(__name__)
+
 
 @router.post(
     "/train",
@@ -57,11 +60,14 @@ async def train_model(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Dataset {request.dataset_id} not found"
         )
 
-    if dataset.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You can only train models on your own datasets",
-        )
+    # Admin can train on any dataset; non-Admin can only train on their own
+    # Note: dataset.user_id is a UUID object, current_user.id is a string
+    if str(dataset.user_id) != str(current_user.id):
+        if current_user.role != "Admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You can only train models on your own datasets",
+            )
 
     if dataset.status != "ready":
         raise HTTPException(
@@ -79,9 +85,73 @@ async def train_model(
             f"Valid types: {', '.join(valid_model_types)}",
         )
 
+    # Check for existing active models AND running/queued training jobs to prevent duplicates
+    from backend.domain.models.model_version import ModelVersion
+    from backend.domain.models.training_job import TrainingJob
+    
+    # Check for existing active model versions
+    existing_models = (
+        db.query(ModelVersion)
+        .filter(
+            ModelVersion.dataset_id == request.dataset_id,
+            ModelVersion.user_id == current_user.id,
+            ModelVersion.status == "active"
+        )
+        .all()
+    )
+    
+    existing_model_types = {model.model_type for model in existing_models}
+    
+    # Also check for running or queued training jobs
+    active_training_jobs = (
+        db.query(TrainingJob)
+        .filter(
+            TrainingJob.dataset_id == request.dataset_id,
+            TrainingJob.user_id == current_user.id,
+            TrainingJob.status.in_(["queued", "running"])
+        )
+        .all()
+    )
+    
+    training_model_types = {job.model_type for job in active_training_jobs}
+    
+    # Combine both sets to get all model types that exist or are being trained
+    all_existing_types = existing_model_types | training_model_types
+    
+    # Filter out model types that already exist or are being trained
+    models_to_train = [mt for mt in request.model_types if mt not in all_existing_types]
+    
+    if len(models_to_train) < len(request.model_types):
+        skipped = [mt for mt in request.model_types if mt in all_existing_types]
+        skipped_reasons = []
+        for mt in skipped:
+            if mt in existing_model_types:
+                skipped_reasons.append(f"{mt} (already exists)")
+            elif mt in training_model_types:
+                skipped_reasons.append(f"{mt} (training in progress)")
+        
+        logger.warning(
+            f"Skipping training for: {', '.join(skipped_reasons)}. "
+            f"Archive existing models or wait for training to complete."
+        )
+    
+    if not models_to_train:
+        error_details = []
+        if existing_model_types:
+            error_details.append(f"Existing models: {', '.join(existing_model_types)}")
+        if training_model_types:
+            error_details.append(f"Training in progress: {', '.join(training_model_types)}")
+        
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"All selected model types already exist or are being trained for this dataset. "
+                   f"{'. '.join(error_details)}. "
+                   f"Please archive existing models or wait for training to complete."
+        )
+
     created_jobs = []
 
-    for model_type in request.model_types:
+    for model_type in models_to_train:
         training_job = TrainingService.create_training_job(
             db=db, user_id=current_user.id, dataset_id=request.dataset_id, model_type=model_type
         )

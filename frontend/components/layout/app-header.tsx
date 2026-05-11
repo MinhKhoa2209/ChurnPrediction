@@ -8,12 +8,44 @@ import { Breadcrumbs } from './breadcrumbs';
 import { ThemeToggle } from './theme-toggle';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { useEffect, useState, useRef } from 'react';
+import { useAuthStore } from '@/lib/store/auth-store';
+import { getUnreadCount } from '@/lib/notifications';
 
 interface AppHeaderProps {
   onCommandMenuOpen?: () => void;
 }
 
 export function AppHeader({ onCommandMenuOpen }: AppHeaderProps) {
+  const { token } = useAuthStore();
+  const [unreadCount, setUnreadCount] = useState(0);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!token) return;
+
+    const fetchCount = async () => {
+      try {
+        const count = await getUnreadCount(token);
+        setUnreadCount(count);
+      } catch {
+        // Silently fail — bell just won't show count
+      }
+    };
+
+    // Fetch immediately
+    fetchCount();
+
+    // Poll every 30 seconds
+    intervalRef.current = setInterval(fetchCount, 30000);
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [token]);
+
   return (
     <header className="flex h-14 shrink-0 items-center gap-2 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-40 px-4">
       <SidebarTrigger className="-ml-1" />
@@ -53,17 +85,19 @@ export function AppHeader({ onCommandMenuOpen }: AppHeaderProps) {
           size="icon"
           className="h-8 w-8 relative"
           asChild
-          aria-label="Notifications"
+          aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : 'Notifications'}
         >
           <Link href="/notifications">
             <Bell className="h-4 w-4" />
-            <Badge
-              variant="destructive"
-              className="absolute -top-0.5 -right-0.5 h-4 w-4 p-0 text-[10px] flex items-center justify-center"
-              aria-label="New notifications"
-            >
-              •
-            </Badge>
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-0.5 -right-0.5 h-4 min-w-[1rem] p-0 text-[10px] flex items-center justify-center"
+                aria-label={`${unreadCount} new notifications`}
+              >
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </Badge>
+            )}
           </Link>
         </Button>
 

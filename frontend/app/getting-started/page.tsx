@@ -158,8 +158,8 @@ export default function GettingStartedPage() {
         'Identify patterns and outliers',
       ],
       action: {
-        label: 'Explore Data',
-        path: '/data/eda',
+        label: 'View Processing & EDA',
+        path: '/data/processing',
       },
       icon: LineChart,
       color: 'green',

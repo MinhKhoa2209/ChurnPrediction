@@ -175,6 +175,7 @@ class MLTrainingService:
                 "gamma": "scale",
                 "probability": True,
                 "random_state": 42,
+                "max_iter": 1000,  # Limit iterations for faster convergence
             },
         }
 
@@ -215,12 +216,14 @@ class MLTrainingService:
                 }
 
             elif model_type == "SVM":
+                # Limit SVM to faster kernels for optimization
                 params = {
-                    "C": trial.suggest_float("C", 0.01, 100.0, log=True),
-                    "kernel": trial.suggest_categorical("kernel", ["linear", "rbf", "poly"]),
+                    "C": trial.suggest_float("C", 0.1, 10.0, log=True),
+                    "kernel": trial.suggest_categorical("kernel", ["linear", "rbf"]),
                     "gamma": trial.suggest_categorical("gamma", ["scale", "auto"]),
                     "probability": True,
                     "random_state": 42,
+                    "max_iter": 1000,  # Limit iterations for faster training
                 }
 
             else:
