@@ -161,6 +161,17 @@ def process_batch_prediction(
             f"time={elapsed_time:.2f}s"
         )
 
+        try:
+            from backend.api.middleware import get_redis_client
+            from backend.services.dashboard_service import DashboardService
+
+            redis_client = get_redis_client()
+            DashboardService.invalidate_cache(redis_client, user_uuid)
+        except Exception as cache_error:
+            logger.warning(
+                f"Failed to invalidate dashboard cache for batch {batch_id}: {cache_error}"
+            )
+
         return {
             "success": True,
             "batch_id": batch_id,

@@ -1,11 +1,12 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useDatasetStore } from '@/lib/store/dataset-store';
 import { api } from '@/lib/api';
-import { Activity, CheckCircle, Clock, Database, ArrowRight, AlertCircle, Loader2 } from 'lucide-react';
+import { listDatasets } from '@/lib/datasets';
+import { Activity, CheckCircle, Clock, Database, ArrowRight, AlertCircle } from 'lucide-react';
 
 interface DatasetProgress {
   status: string;
@@ -21,10 +22,15 @@ interface DatasetProgress {
 
 export default function DataProcessingPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, token, isLoading: authLoading } = useAuthStore();
   const { currentDataset } = useDatasetStore();
+  const requestedDatasetId = searchParams.get('dataset');
+  const fallbackDatasetId = currentDataset?.id ?? null;
+  const fallbackDatasetFilename = currentDataset?.filename ?? null;
   
   const [activeTab, setActiveTab] = useState<'overview' | 'cleaning' | 'transformation'>('overview');
+  const [activeDataset, setActiveDataset] = useState<{ id: string; filename: string } | null>(null);
   const [progress, setProgress] = useState<DatasetProgress | null>(null);
   const [logs, setLogs] = useState<string[]>([]);
 
@@ -55,18 +61,69 @@ export default function DataProcessingPage() {
     }
   }, [progress]);
 
-  // Poll progress when we have a processing dataset
   useEffect(() => {
-    if (!currentDataset?.id || !token) return;
+    if (!token) return;
 
-    let intervalId: NodeJS.Timeout;
+    let cancelled = false;
+
+    const resolveDataset = async () => {
+      try {
+        const response = await listDatasets(token);
+        const datasets = Array.isArray(response.datasets) ? response.datasets : [];
+
+        const selectedDataset =
+          (requestedDatasetId ? datasets.find((dataset) => dataset.id === requestedDatasetId) : null) ??
+          (fallbackDatasetId ? datasets.find((dataset) => dataset.id === fallbackDatasetId) : null) ??
+          datasets.find((dataset) => dataset.status === 'processing') ??
+          datasets.find((dataset) => dataset.status === 'ready') ??
+          datasets.find((dataset) => dataset.status === 'failed') ??
+          null;
+
+        if (!cancelled) {
+          setActiveDataset(
+            selectedDataset
+              ? {
+                  id: selectedDataset.id,
+                  filename: selectedDataset.filename,
+                }
+              : null
+          );
+        }
+      } catch (err) {
+        console.error('[ProcessingPage] Error loading datasets:', err);
+
+        if (!cancelled) {
+          setActiveDataset(
+            fallbackDatasetId && fallbackDatasetFilename
+              ? {
+                  id: fallbackDatasetId,
+                  filename: fallbackDatasetFilename,
+                }
+              : null
+          );
+        }
+      }
+    };
+
+    resolveDataset();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fallbackDatasetFilename, fallbackDatasetId, requestedDatasetId, token]);
+
+  // Poll progress when we have a valid dataset
+  useEffect(() => {
+    if (!activeDataset?.id || !token) return;
+
+    let intervalId: NodeJS.Timeout | null = null;
     let stopped = false;
 
     const fetchProgress = async () => {
       if (stopped) return;
       try {
         const data = await api.get<DatasetProgress>(
-          `/datasets/${currentDataset.id}/progress`,
+          `/datasets/${activeDataset.id}/progress`,
           token
         );
 
@@ -89,6 +146,14 @@ export default function DataProcessingPage() {
           clearInterval(intervalId);
         }
       } catch (err) {
+        const errorMessage = err instanceof Error ? err.message.toLowerCase() : '';
+
+        if (errorMessage.includes('dataset not found')) {
+          setProgress(null);
+          setLogs([]);
+          return;
+        }
+
         console.error('[ProcessingPage] Error fetching progress:', err);
       }
     };
@@ -98,9 +163,11 @@ export default function DataProcessingPage() {
 
     return () => {
       stopped = true;
-      clearInterval(intervalId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
     };
-  }, [currentDataset?.id, token]);
+  }, [activeDataset?.id, token]);
 
   useEffect(() => {
     if (!authLoading && (!user || user.role !== 'Admin')) {
@@ -178,7 +245,7 @@ export default function DataProcessingPage() {
             <div>
               <h2 className="text-2xl font-bold text-gray-900 dark:text-foreground">Dataset Processing</h2>
               <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                {currentDataset ? `Processing dataset: ${currentDataset.filename || currentDataset.id}` : 'No active dataset selected for processing'}
+                {activeDataset ? `Processing dataset: ${activeDataset.filename || activeDataset.id}` : 'No active dataset selected for processing'}
               </p>
               {progress && (
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
@@ -196,11 +263,11 @@ export default function DataProcessingPage() {
               </button>
               <button 
                 onClick={() => {
-                  if (currentDataset?.id) {
-                    router.push(`/data/eda/${currentDataset.id}`);
+                  if (activeDataset?.id) {
+                    router.push(`/data/eda/${activeDataset.id}`);
                   }
                 }}
-                disabled={!currentDataset || !isCompleted}
+                disabled={!activeDataset || !isCompleted}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
               >
                 Continue to EDA <ArrowRight className="w-4 h-4" />
@@ -209,7 +276,7 @@ export default function DataProcessingPage() {
           </div>
 
           {/* Progress Bar */}
-          {progress && currentDataset && (
+          {progress && activeDataset && (
             <div className="bg-white dark:bg-card shadow rounded-lg p-4">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
@@ -275,7 +342,7 @@ export default function DataProcessingPage() {
                   <div className="space-y-6">
                     <h3 className="text-lg font-bold text-gray-900 dark:text-foreground border-b pb-2">Pipeline Status</h3>
                     
-                    {!currentDataset ? (
+                    {!activeDataset ? (
                       <div className="text-center py-12">
                         <Database className="w-12 h-12 text-gray-400 mx-auto mb-3" />
                         <p className="text-gray-500">Please upload a dataset first to view processing details.</p>
@@ -364,7 +431,7 @@ export default function DataProcessingPage() {
                         <>
                           <p>Waiting for processing events...</p>
                           <p className="text-gray-500">
-                            {currentDataset ? 'Polling for progress updates...' : 'Upload a dataset to begin.'}
+                            {activeDataset ? 'Polling for progress updates...' : 'Upload a dataset to begin.'}
                           </p>
                         </>
                       ) : (

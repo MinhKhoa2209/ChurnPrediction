@@ -2,7 +2,7 @@ import base64
 import logging
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import (
@@ -11,7 +11,12 @@ from backend.api.dependencies import (
 )
 from backend.domain.models.dataset import Dataset
 from backend.domain.schemas.auth import UserResponse
-from backend.domain.schemas.dataset import DatasetUploadResponse, DatasetProgressResponse
+from backend.domain.schemas.dataset import (
+    DatasetListResponse,
+    DatasetProgressResponse,
+    DatasetResponse,
+    DatasetUploadResponse,
+)
 from backend.infrastructure.database import get_db
 from backend.services.dataset_service import DatasetService
 from backend.workers.dataset_tasks import process_csv_file
@@ -37,6 +42,7 @@ MAX_FILE_SIZE = 50 * 1024 * 1024
 )
 async def upload_dataset(
     file: UploadFile = File(..., description="CSV file containing customer data"),
+    response: Response = None,
     current_user: Annotated[UserResponse, Depends(require_admin)] = None,
     db: Session = Depends(get_db),
 ) -> DatasetUploadResponse:
@@ -59,12 +65,42 @@ async def upload_dataset(
     if not is_valid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=error_message)
 
+    file_hash = DatasetService.calculate_file_hash(file_content)
+    existing_dataset = DatasetService.get_dataset_by_file_hash(
+        db,
+        file_hash=file_hash,
+        statuses={"processing", "ready"},
+    )
+    if existing_dataset:
+        message = (
+            "This dataset is already being processed. Reusing the existing upload."
+            if existing_dataset.status == "processing"
+            else "This dataset is already ready. Reusing the existing processed dataset."
+        )
+        if response is not None and existing_dataset.status == "ready":
+            response.status_code = status.HTTP_200_OK
+
+        logger.info(
+            "Reused existing dataset %s for upload request by user %s",
+            existing_dataset.id,
+            current_user.email,
+        )
+
+        return DatasetUploadResponse(
+            id=existing_dataset.id,
+            filename=existing_dataset.filename,
+            status=existing_dataset.status,
+            message=message,
+            uploaded_at=existing_dataset.uploaded_at,
+        )
+
     dataset = DatasetService.create_dataset(
         db=db,
         user_id=current_user.id,
         filename=file.filename,
         record_count=row_count,
         status="processing",
+        file_hash=file_hash,
     )
 
     file_content_base64 = base64.b64encode(file_content).decode("utf-8")
@@ -127,16 +163,6 @@ async def get_dataset_progress(
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Dataset not found"
-        )
-
-    # Check permissions
-    from uuid import UUID as UUIDType
-    current_user_uuid = UUIDType(current_user.id) if isinstance(current_user.id, str) else current_user.id
-    
-    if current_user.role != "Admin" and dataset.user_id != current_user_uuid:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Access denied"
         )
 
     # Get progress from Redis
@@ -204,7 +230,7 @@ async def get_dataset_progress(
 
 @router.get(
     "",
-    response_model=dict,
+    response_model=DatasetListResponse,
     responses={
         200: {"description": "List of datasets"},
     },
@@ -213,21 +239,16 @@ async def list_datasets(
     current_user: Annotated[UserResponse, Depends(require_any_authenticated_user)],
     db: Session = Depends(get_db),
 ):
-    if current_user.role == "Admin":
-        datasets = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
-    else:
-        datasets = DatasetService.get_user_datasets(db, current_user.id)
-
-    from backend.domain.schemas.dataset import DatasetResponse
+    datasets = db.query(Dataset).order_by(Dataset.uploaded_at.desc()).all()
 
     dataset_responses = [DatasetResponse.model_validate(ds) for ds in datasets]
 
-    return {"datasets": dataset_responses, "total": len(dataset_responses)}
+    return DatasetListResponse(datasets=dataset_responses, total=len(dataset_responses))
 
 
 @router.get(
     "/{dataset_id}",
-    response_model=dict,
+    response_model=DatasetResponse,
     responses={
         200: {"description": "Dataset details"},
         404: {"description": "Dataset not found"},
@@ -250,11 +271,6 @@ async def get_dataset(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
-
-    from backend.domain.schemas.dataset import DatasetResponse
-
     return DatasetResponse.model_validate(dataset)
 
 
@@ -274,6 +290,8 @@ async def delete_dataset(
 ):
     from uuid import UUID
 
+    from backend.domain.models.model_version import ModelVersion
+
     try:
         dataset_uuid = UUID(dataset_id)
     except ValueError:
@@ -284,11 +302,41 @@ async def delete_dataset(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
+    artifact_paths = [
+        artifact_path
+        for (artifact_path,) in (
+            db.query(ModelVersion.artifact_path)
+            .filter(
+                ModelVersion.dataset_id == dataset_uuid,
+                ModelVersion.artifact_path.isnot(None),
+            )
+            .all()
+        )
+        if artifact_path
+    ]
 
     db.delete(dataset)
     db.commit()
+
+    try:
+        from backend.infrastructure.cache import cache_client
+        from backend.services.dashboard_service import DashboardService
+        from backend.infrastructure.storage import storage_client
+
+        for artifact_path in artifact_paths:
+            try:
+                storage_client.delete_artifact(artifact_path)
+            except Exception as storage_error:
+                logger.warning(
+                    "Failed to delete model artifact %s during dataset cleanup: %s",
+                    artifact_path,
+                    storage_error,
+                )
+
+        if cache_client.is_available and cache_client.redis_client:
+            DashboardService.invalidate_cache(cache_client.redis_client)
+    except Exception as cache_error:
+        logger.warning(f"Failed to invalidate dashboard cache after dataset delete: {cache_error}")
 
     logger.info(f"Deleted dataset {dataset_id} by user {current_user.email}")
 
@@ -336,9 +384,6 @@ async def get_dataset_records(
     dataset = DatasetService.get_dataset_by_id(db, dataset_uuid)
 
     if not dataset:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
-
-    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     total_count = db.query(CustomerRecord).filter(CustomerRecord.dataset_id == dataset_uuid).count()
@@ -422,9 +467,6 @@ async def get_dataset_quality(
     if not dataset:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
-    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
-
     try:
         quality_report = DataQualityService.analyze_data_quality(db, dataset_uuid)
         return quality_report
@@ -460,9 +502,6 @@ async def get_dataset_statistics(
     dataset = DatasetService.get_dataset_by_id(db, dataset_uuid)
 
     if not dataset:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
-
-    if current_user.role != "Admin" and str(dataset.user_id) != str(current_user.id):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Dataset not found")
 
     records = db.query(CustomerRecord).filter(CustomerRecord.dataset_id == dataset_uuid).all()

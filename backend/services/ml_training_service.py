@@ -1,13 +1,14 @@
 import io
 import logging
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 from uuid import UUID
 
 import joblib
 import numpy as np
 import optuna
 import pandas as pd
+from optuna.trial import FrozenTrial
 from sklearn.metrics import (
     accuracy_score,
     confusion_matrix,
@@ -47,6 +48,7 @@ class MLTrainingService:
         model_type: str,
         hyperparameters: Optional[Dict[str, Any]] = None,
         optimize_hyperparameters: bool = False,
+        progress_callback: Optional[Callable[[int, Optional[int], Optional[int]], None]] = None,
     ) -> ModelVersion:
         start_time = time.time()
 
@@ -60,6 +62,14 @@ class MLTrainingService:
             f"Starting model training: {model_type} for user {user_id}, "
             f"dataset {dataset_id}, optimize={optimize_hyperparameters}"
         )
+
+        def emit_progress(
+            progress: int,
+            current_iteration: Optional[int] = None,
+            total_iterations: Optional[int] = None,
+        ) -> None:
+            if progress_callback:
+                progress_callback(progress, current_iteration, total_iterations)
 
         preprocessed_data = PreprocessingService.preprocess_dataset(
             db=db, dataset_id=dataset_id, test_size=0.2, random_state=42, apply_smote=True
@@ -75,20 +85,31 @@ class MLTrainingService:
             f"Preprocessing complete: train_size={len(X_train)}, "
             f"test_size={len(X_test)}, features={len(X_train.columns)}"
         )
+        emit_progress(25)
 
         if optimize_hyperparameters:
             hyperparameters = MLTrainingService._optimize_hyperparameters(
-                model_type=model_type, X_train=X_train, y_train=y_train
+                model_type=model_type,
+                X_train=X_train,
+                y_train=y_train,
+                progress_callback=lambda current, total: emit_progress(
+                    30 + int((current / max(total, 1)) * 40),
+                    current,
+                    total,
+                ),
             )
             logger.info(f"Optimized hyperparameters: {hyperparameters}")
         elif hyperparameters is None:
             hyperparameters = MLTrainingService._get_default_hyperparameters(model_type)
             logger.info(f"Using default hyperparameters: {hyperparameters}")
 
+        emit_progress(70)
+
         model_class = MLTrainingService.MODEL_CLASSES[model_type]
         model = model_class(**hyperparameters)
 
         logger.info(f"Training {model_type} model...")
+        emit_progress(80)
         model.fit(X_train, y_train)
 
         training_time = time.time() - start_time
@@ -97,6 +118,7 @@ class MLTrainingService:
         metrics, conf_matrix = MLTrainingService._evaluate_model(
             model=model, X_test=X_test, y_test=y_test
         )
+        emit_progress(90)
 
         logger.info(
             f"Model evaluation: accuracy={metrics['accuracy']:.4f}, "
@@ -131,6 +153,7 @@ class MLTrainingService:
             file_data=model_bytes,
             filename="model.joblib",
         )
+        emit_progress(95)
 
         model_version.artifact_path = artifact_path
 
@@ -171,11 +194,12 @@ class MLTrainingService:
             },
             "SVM": {
                 "C": 1.0,
-                "kernel": "rbf",
+                "kernel": "linear",
                 "gamma": "scale",
                 "probability": True,
                 "random_state": 42,
-                "max_iter": 1000,  # Limit iterations for faster convergence
+                "cache_size": 512,
+                "max_iter": 1500,
             },
         }
 
@@ -188,7 +212,12 @@ class MLTrainingService:
         y_train: pd.Series,
         n_trials: int = 50,
         cv_folds: int = 5,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Dict[str, Any]:
+        if model_type == "SVM":
+            n_trials = min(n_trials, 12)
+            cv_folds = min(cv_folds, 3)
+
         logger.info(
             f"Starting hyperparameter optimization for {model_type}: "
             f"{n_trials} trials, {cv_folds}-fold CV"
@@ -216,14 +245,14 @@ class MLTrainingService:
                 }
 
             elif model_type == "SVM":
-                # Limit SVM to faster kernels for optimization
                 params = {
                     "C": trial.suggest_float("C", 0.1, 10.0, log=True),
                     "kernel": trial.suggest_categorical("kernel", ["linear", "rbf"]),
                     "gamma": trial.suggest_categorical("gamma", ["scale", "auto"]),
-                    "probability": True,
+                    "probability": False,
                     "random_state": 42,
-                    "max_iter": 1000,  # Limit iterations for faster training
+                    "cache_size": 512,
+                    "max_iter": 1500,
                 }
 
             else:
@@ -241,13 +270,24 @@ class MLTrainingService:
             direction="maximize", sampler=optuna.samplers.TPESampler(seed=42)
         )
 
-        study.optimize(objective, n_trials=n_trials, show_progress_bar=False)
+        def handle_trial_complete(study: optuna.Study, trial: FrozenTrial) -> None:
+            if progress_callback:
+                progress_callback(trial.number + 1, n_trials)
+
+        study.optimize(
+            objective,
+            n_trials=n_trials,
+            show_progress_bar=False,
+            callbacks=[handle_trial_complete],
+        )
 
         best_params = study.best_params
 
         if model_type == "SVM":
             best_params["probability"] = True
             best_params["random_state"] = 42
+            best_params["cache_size"] = 512
+            best_params["max_iter"] = 1500
         elif model_type == "DecisionTree":
             best_params["random_state"] = 42
 

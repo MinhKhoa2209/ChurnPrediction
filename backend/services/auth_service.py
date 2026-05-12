@@ -11,6 +11,8 @@ from backend.domain.models.user import User
 
 
 class AuthService:
+    VALID_ROLES = {"Admin", "Analyst"}
+
     @staticmethod
     def hash_password(password: str) -> str:
         salt = bcrypt.gensalt(rounds=settings.password_bcrypt_rounds)
@@ -45,10 +47,20 @@ class AuthService:
             return None
 
     @staticmethod
-    def register_user(db: Session, email: str, password: str, name: str = "") -> User:
+    def register_user(
+        db: Session,
+        email: str,
+        password: str,
+        name: str = "",
+        role: str = "Analyst",
+        provider: str = "credentials",
+    ) -> User:
         existing_user = db.query(User).filter(User.email == email).first()
         if existing_user:
             raise ValueError("Email already registered")
+
+        if role not in AuthService.VALID_ROLES:
+            raise ValueError(f"Invalid role '{role}'")
 
         password_hash = AuthService.hash_password(password)
 
@@ -56,8 +68,8 @@ class AuthService:
             email=email,
             password_hash=password_hash,
             name=name or None,
-            role="Analyst",
-            provider="credentials",
+            role=role,
+            provider=provider,
         )
 
         db.add(user)

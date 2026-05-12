@@ -15,16 +15,11 @@ logger = logging.getLogger(__name__)
 class EDAService:
     @staticmethod
     def _get_dataset_for_eda(db: Session, dataset_id: UUID, user_id: UUID, is_admin: bool = False) -> Dataset:
-        """Get dataset with access check. Admin users can access any dataset."""
-        if is_admin:
-            dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
-        else:
-            dataset = db.query(Dataset).filter(
-                Dataset.id == dataset_id, Dataset.user_id == user_id
-            ).first()
+        """Get dataset for analysis. All authenticated roles can analyze shared datasets."""
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
         if not dataset:
-            raise ValueError("Dataset not found or access denied")
+            raise ValueError("Dataset not found")
 
         if dataset.status != "ready":
             raise ValueError(f"Dataset is not ready for analysis. Current status: {dataset.status}")

@@ -188,7 +188,7 @@ async def list_training_jobs(
 ):
     try:
         jobs = TrainingService.list_training_jobs(
-            db=db, user_id=current_user.id, status_filter=status_filter
+            db=db, user_id=None, status_filter=status_filter
         )
 
         job_responses = [TrainingJobResponse.model_validate(job) for job in jobs]
@@ -218,7 +218,7 @@ async def get_training_job(
     except ValueError:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid job_id format")
 
-    training_job = TrainingService.get_training_job(db=db, job_id=job_uuid, user_id=current_user.id)
+    training_job = TrainingService.get_training_job(db=db, job_id=job_uuid, user_id=None)
 
     if not training_job:
         raise HTTPException(
@@ -291,7 +291,7 @@ async def list_model_versions(
     try:
         versions = ModelEvaluationService.list_model_versions(
             db=db,
-            user_id=current_user.id,
+            user_id=None,
             model_type=model_type,
             status=status,
             sort_by=sort_by,
@@ -300,7 +300,10 @@ async def list_model_versions(
 
         version_responses = []
         for version in versions:
-            metrics = ModelMetrics(**version.metrics)
+            metrics_data = version.metrics or {}
+            if not metrics_data:
+                metrics_data = {"accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1_score": 0.0, "roc_auc": 0.0}
+            metrics = ModelMetrics(**metrics_data)
 
             version_dict = {
                 "id": version.id,
@@ -351,7 +354,7 @@ async def get_model_version(
         )
 
     model_version = ModelEvaluationService.get_model_version_by_id(
-        db=db, version_id=version_uuid, user_id=current_user.id
+        db=db, version_id=version_uuid, user_id=None
     )
 
     if not model_version:
@@ -359,7 +362,10 @@ async def get_model_version(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Model version {version_id} not found"
         )
 
-    metrics = ModelMetrics(**model_version.metrics)
+    metrics_data = model_version.metrics or {}
+    if not metrics_data:
+        metrics_data = {"accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1_score": 0.0, "roc_auc": 0.0}
+    metrics = ModelMetrics(**metrics_data)
 
     version_dict = {
         "id": model_version.id,
@@ -406,7 +412,7 @@ async def get_model_metrics(
         )
 
     model_version = ModelEvaluationService.get_model_version_by_id(
-        db=db, version_id=version_uuid, user_id=current_user.id
+        db=db, version_id=version_uuid, user_id=None
     )
 
     if not model_version:
@@ -414,7 +420,10 @@ async def get_model_metrics(
             status_code=status.HTTP_404_NOT_FOUND, detail=f"Model version {version_id} not found"
         )
 
-    return ModelMetrics(**model_version.metrics)
+    metrics_data = model_version.metrics or {}
+    if not metrics_data:
+        metrics_data = {"accuracy": 0.0, "precision": 0.0, "recall": 0.0, "f1_score": 0.0, "roc_auc": 0.0}
+    return ModelMetrics(**metrics_data)
 
 
 @router.get(
@@ -440,7 +449,7 @@ async def get_confusion_matrix(
         )
 
     model_version = ModelEvaluationService.get_model_version_by_id(
-        db=db, version_id=version_uuid, user_id=current_user.id
+        db=db, version_id=version_uuid, user_id=None
     )
 
     if not model_version:
@@ -478,7 +487,7 @@ async def get_roc_curve(
 
     try:
         roc_data = ModelEvaluationService.compute_roc_curve(
-            db=db, version_id=version_uuid, user_id=current_user.id
+            db=db, version_id=version_uuid, user_id=None
         )
 
         return ROCCurveResponse(**roc_data)

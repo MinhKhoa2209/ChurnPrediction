@@ -38,8 +38,8 @@ async def get_dashboard_metrics(
 
     try:
         user_id = None if current_user.role == "Admin" else UUID(current_user.id)
-
-        cache_key = f"dashboard:metrics:{user_id or 'all'}"
+        scope_key = str(user_id) if user_id else "shared"
+        cache_key = f"dashboard:metrics:v2:{scope_key}"
 
         try:
             cached_data = redis_client.get(cache_key)

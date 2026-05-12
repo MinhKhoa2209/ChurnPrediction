@@ -1,8 +1,9 @@
 import csv
+import hashlib
 import io
 import logging
 from datetime import datetime
-from typing import Optional
+from typing import Iterable, Optional
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -63,6 +64,23 @@ CATEGORICAL_VALUES = {
 
 
 class DatasetService:
+    @staticmethod
+    def calculate_file_hash(file_content: bytes) -> str:
+        return hashlib.sha256(file_content).hexdigest()
+
+    @staticmethod
+    def get_dataset_by_file_hash(
+        db: Session,
+        file_hash: str,
+        statuses: Optional[Iterable[str]] = None,
+    ) -> Optional[Dataset]:
+        query = db.query(Dataset).filter(Dataset.file_hash == file_hash)
+
+        if statuses:
+            query = query.filter(Dataset.status.in_(list(statuses)))
+
+        return query.order_by(Dataset.uploaded_at.desc()).first()
+
     @staticmethod
     def validate_csv_file(file_content: bytes) -> tuple[bool, Optional[str], Optional[int]]:
         try:
@@ -162,11 +180,17 @@ class DatasetService:
 
     @staticmethod
     def create_dataset(
-        db: Session, user_id: UUID, filename: str, record_count: int, status: str = "processing"
+        db: Session,
+        user_id: UUID,
+        filename: str,
+        record_count: int,
+        status: str = "processing",
+        file_hash: Optional[str] = None,
     ) -> Dataset:
         dataset = Dataset(
             user_id=user_id,
             filename=filename,
+            file_hash=file_hash,
             record_count=record_count,
             status=status,
             uploaded_at=datetime.utcnow(),

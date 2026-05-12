@@ -14,15 +14,21 @@ import { cn } from '@/lib/utils';
 interface PredictionResultProps {
   prediction: PredictionResponse;
   onReset: () => void;
-  userRole: string;
 }
 
-export default function PredictionResult({ prediction, onReset, userRole }: PredictionResultProps) {
+export default function PredictionResult({ prediction, onReset }: PredictionResultProps) {
   const probabilityPercent = (prediction.probability * 100).toFixed(1);
   const probabilityNum = prediction.probability * 100;
   const thresholdPercent = (prediction.threshold * 100).toFixed(0);
   const colors = getProbabilityColor(prediction.probability);
   const isChurn = prediction.prediction === 'Churn';
+  const shapValues = {
+    base_value: prediction.shap_values?.base_value ?? prediction.probability,
+    prediction_value: prediction.shap_values?.prediction_value ?? prediction.probability,
+    top_positive: prediction.shap_values?.top_positive ?? [],
+    top_negative: prediction.shap_values?.top_negative ?? [],
+  };
+  const hasKeyFactors = shapValues.top_positive.length > 0 || shapValues.top_negative.length > 0;
 
   const riskVariant = prediction.probability < 0.3 ? 'secondary'
     : prediction.probability < 0.7 ? 'outline'
@@ -119,7 +125,7 @@ export default function PredictionResult({ prediction, onReset, userRole }: Pred
           </p>
         </CardHeader>
         <CardContent>
-          <ShapWaterfallChart shapValues={prediction.shap_values} />
+          <ShapWaterfallChart shapValues={shapValues} />
         </CardContent>
       </Card>
 
@@ -129,14 +135,20 @@ export default function PredictionResult({ prediction, onReset, userRole }: Pred
           <CardTitle className="text-base">Key Factors</CardTitle>
         </CardHeader>
         <CardContent className="space-y-6">
-          {prediction.shap_values.top_positive.length > 0 && (
+          {!hasKeyFactors && (
+            <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+              Key factors are not available for this prediction yet.
+            </div>
+          )}
+
+          {shapValues.top_positive.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-red-600 dark:text-red-400 mb-3 flex items-center gap-1.5">
                 <TrendingDown className="h-4 w-4" />
                 Factors Increasing Churn Risk
               </h4>
               <div className="space-y-2">
-                {prediction.shap_values.top_positive.map((contrib, idx) => (
+                {shapValues.top_positive.map((contrib, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-red-50 dark:bg-red-900/15 border border-red-200 dark:border-red-800">
                     <div className="flex-1">
                       <p className="text-sm font-medium">{contrib.feature}</p>
@@ -151,14 +163,14 @@ export default function PredictionResult({ prediction, onReset, userRole }: Pred
             </div>
           )}
 
-          {prediction.shap_values.top_negative.length > 0 && (
+          {shapValues.top_negative.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mb-3 flex items-center gap-1.5">
                 <TrendingUp className="h-4 w-4" />
                 Factors Decreasing Churn Risk
               </h4>
               <div className="space-y-2">
-                {prediction.shap_values.top_negative.map((contrib, idx) => (
+                {shapValues.top_negative.map((contrib, idx) => (
                   <div key={idx} className="flex items-center justify-between p-3 rounded-lg bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200 dark:border-emerald-800">
                     <div className="flex-1">
                       <p className="text-sm font-medium">{contrib.feature}</p>
@@ -196,7 +208,7 @@ export default function PredictionResult({ prediction, onReset, userRole }: Pred
             </div>
             <div>
               <dt className="font-medium text-muted-foreground">Base Value</dt>
-              <dd className="mt-1 text-foreground">{(prediction.shap_values.base_value * 100).toFixed(1)}%</dd>
+              <dd className="mt-1 text-foreground">{(shapValues.base_value * 100).toFixed(1)}%</dd>
             </div>
           </dl>
         </CardContent>

@@ -272,7 +272,7 @@ export default function EDAPage() {
                 </p>
                 <div className="flex gap-3">
                   <button
-                    onClick={() => router.push('/data/processing')}
+                    onClick={() => router.push(`/data/processing?dataset=${datasetId}`)}
                     className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-md text-sm font-medium"
                   >
                     View Processing Status

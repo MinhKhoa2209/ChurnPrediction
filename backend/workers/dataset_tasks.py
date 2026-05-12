@@ -26,6 +26,28 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 encryption_service = EncryptionService(settings.encryption_key)
 
 
+def _cleanup_dataset_records(db, dataset_id: UUID) -> int:
+    deleted_count = (
+        db.query(CustomerRecord)
+        .filter(CustomerRecord.dataset_id == dataset_id)
+        .delete(synchronize_session=False)
+    )
+    db.commit()
+    logger.info(f"Removed {deleted_count} partial record(s) for dataset {dataset_id}")
+    return deleted_count
+
+
+def _invalidate_dashboard_cache() -> None:
+    try:
+        from backend.infrastructure.cache import cache_client
+        from backend.services.dashboard_service import DashboardService
+
+        if cache_client.is_available and cache_client.redis_client:
+            DashboardService.invalidate_cache(cache_client.redis_client)
+    except Exception as exc:
+        logger.warning(f"Failed to invalidate dashboard cache: {exc}")
+
+
 @celery_app.task(name="backend.workers.dataset_tasks.process_csv_file", bind=True)
 def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
     import base64
@@ -176,6 +198,11 @@ def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
 
         # Mark as complete or failed based on duplicates
         if duplicate_count > 0:
+            dataset_uuid = UUID(dataset_id)
+            if records_created > 0:
+                _cleanup_dataset_records(db, dataset_uuid)
+                records_created = 0
+
             max_duplicates_to_report = 10
             duplicate_sample = duplicate_ids[:max_duplicates_to_report]
 
@@ -186,10 +213,11 @@ def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
 
             DatasetService.update_dataset_status(
                 db,
-                UUID(dataset_id),
+                dataset_uuid,
                 status="failed",
                 validation_errors={"duplicates": error_msg, "duplicate_ids": duplicate_ids},
             )
+            _invalidate_dashboard_cache()
 
             # Mark as failed in Redis
             cache_client.set_json(
@@ -218,6 +246,7 @@ def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
         DatasetService.update_dataset_status(
             db, UUID(dataset_id), status="ready", data_quality_score=100.0
         )
+        _invalidate_dashboard_cache()
 
         # Mark as complete in Redis
         cache_client.set_json(
@@ -262,9 +291,19 @@ def process_csv_file(self, dataset_id: str, file_content_base64: str) -> dict:
     except Exception as e:
         logger.error(f"Error processing dataset {dataset_id}: {e}", exc_info=True)
 
+        dataset_uuid = UUID(dataset_id)
+        try:
+            _cleanup_dataset_records(db, dataset_uuid)
+        except Exception as cleanup_error:
+            logger.error(
+                f"Failed to clean up partial records for dataset {dataset_id}: {cleanup_error}",
+                exc_info=True,
+            )
+
         DatasetService.update_dataset_status(
-            db, UUID(dataset_id), status="failed", validation_errors={"error": str(e)}
+            db, dataset_uuid, status="failed", validation_errors={"error": str(e)}
         )
+        _invalidate_dashboard_cache()
 
         # Mark as failed in Redis
         from backend.infrastructure.cache import cache_client

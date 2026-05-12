@@ -54,7 +54,7 @@ export default function GettingStartedPage() {
       ],
       action: {
         label: 'Single Prediction',
-        path: '/predictions/single',
+        path: '/predictions',
       },
       icon: Target,
       color: 'blue',
@@ -210,7 +210,7 @@ export default function GettingStartedPage() {
       ],
       action: {
         label: 'Make Predictions',
-        path: '/predictions/single',
+        path: '/predictions',
       },
       icon: Target,
       color: 'pink',

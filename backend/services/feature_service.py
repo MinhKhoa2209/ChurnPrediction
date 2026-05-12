@@ -17,12 +17,10 @@ logger = logging.getLogger(__name__)
 class FeatureService:
     @staticmethod
     def compute_feature_importance(db: Session, dataset_id: UUID, user_id: UUID) -> Dict[str, Any]:
-        dataset = (
-            db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.user_id == user_id).first()
-        )
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
         if not dataset:
-            raise ValueError("Dataset not found or access denied")
+            raise ValueError("Dataset not found")
 
         if dataset.status != "ready":
             raise ValueError(f"Dataset is not ready for analysis. Current status: {dataset.status}")
@@ -139,12 +137,10 @@ class FeatureService:
             if not (0.0 <= importance_threshold <= 1.0):
                 raise ValueError("importanceThreshold must be between 0.0 and 1.0")
 
-        dataset = (
-            db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.user_id == user_id).first()
-        )
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
         if not dataset:
-            raise ValueError("Dataset not found or access denied")
+            raise ValueError("Dataset not found")
 
         if dataset.status != "ready":
             raise ValueError(f"Dataset is not ready for analysis. Current status: {dataset.status}")
@@ -222,12 +218,10 @@ class FeatureService:
 
     @staticmethod
     def create_interaction_features(db: Session, dataset_id: UUID, user_id: UUID) -> Dict[str, Any]:
-        dataset = (
-            db.query(Dataset).filter(Dataset.id == dataset_id, Dataset.user_id == user_id).first()
-        )
+        dataset = db.query(Dataset).filter(Dataset.id == dataset_id).first()
 
         if not dataset:
-            raise ValueError("Dataset not found or access denied")
+            raise ValueError("Dataset not found")
 
         if dataset.status != "ready":
             raise ValueError(f"Dataset is not ready for analysis. Current status: {dataset.status}")

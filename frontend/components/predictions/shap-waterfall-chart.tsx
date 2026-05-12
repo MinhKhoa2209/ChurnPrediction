@@ -1,7 +1,7 @@
 
 'use client';
 
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, ReferenceLine } from 'recharts';
 import type { ShapValues } from '@/lib/predictions';
 
 interface ShapWaterfallChartProps {
@@ -25,11 +25,39 @@ interface WaterfallTooltipProps {
   payload?: WaterfallTooltipPayload[];
 }
 
+function CustomTooltip({ active, payload }: WaterfallTooltipProps) {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload as WaterfallDataPoint;
+    return (
+      <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg p-3">
+        <p className="text-sm font-semibold text-gray-900 dark:text-foreground mb-1">
+          {data.feature}
+        </p>
+        <p className={`text-sm font-medium ${data.isPositive ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+          Contribution: {data.displayValue}
+        </p>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+          Cumulative: {(data.cumulativeValue * 100).toFixed(1)}%
+        </p>
+      </div>
+    );
+  }
+  return null;
+}
+
 export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartProps) {
   const allContributions = [
     ...shapValues.top_positive,
     ...shapValues.top_negative,
   ].sort((a, b) => Math.abs(b.contribution) - Math.abs(a.contribution));
+
+  if (allContributions.length === 0) {
+    return (
+      <div className="rounded-lg border border-dashed border-border bg-muted/40 p-4 text-sm text-muted-foreground">
+        Feature contribution details are not available for this prediction.
+      </div>
+    );
+  }
 
   const waterfallData: WaterfallDataPoint[] = [];
   let cumulativeValue = shapValues.base_value;
@@ -62,26 +90,6 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
     displayValue: `${(shapValues.prediction_value * 100).toFixed(1)}%`,
   });
 
-  const CustomTooltip = ({ active, payload }: WaterfallTooltipProps) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload as WaterfallDataPoint;
-      return (
-        <div className="bg-white dark:bg-card border border-gray-200 dark:border-border rounded-lg shadow-lg p-3">
-          <p className="text-sm font-semibold text-gray-900 dark:text-foreground mb-1">
-            {data.feature}
-          </p>
-          <p className={`text-sm font-medium ${data.isPositive ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-            Contribution: {data.displayValue}
-          </p>
-          <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-            Cumulative: {(data.cumulativeValue * 100).toFixed(1)}%
-          </p>
-        </div>
-      );
-    }
-    return null;
-  };
-
   return (
     <div className="w-full">
       <ResponsiveContainer width="100%" height={400}>
@@ -110,7 +118,7 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
               className: 'text-gray-700 dark:text-gray-300',
             }}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={CustomTooltip} />
           <ReferenceLine y={0} stroke="#666" strokeDasharray="3 3" />
           <Bar dataKey="contribution" radius={[4, 4, 0, 0]}>
             {waterfallData.map((entry, index) => (
@@ -147,7 +155,7 @@ export default function ShapWaterfallChart({ shapValues }: ShapWaterfallChartPro
       <div className="mt-4 p-4 bg-gray-50 dark:bg-background rounded-lg">
         <p className="text-xs text-gray-600 dark:text-gray-400">
           <strong>How to read this chart:</strong> The waterfall chart shows how the prediction builds up from the base value (average prediction for all customers) 
-          through each feature's contribution to reach the final prediction. Red bars push the probability higher (toward churn), 
+          through each feature&apos;s contribution to reach the final prediction. Red bars push the probability higher (toward churn), 
           while green bars pull it lower (away from churn).
         </p>
       </div>

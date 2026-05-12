@@ -291,13 +291,13 @@ export default function DashboardPage() {
       )}
 
       {/* Quick Actions */}
-      {user.role === 'Admin' && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+            {user.role === 'Admin' ? (
               <ShadcnTooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -311,38 +311,52 @@ export default function DashboardPage() {
                 </TooltipTrigger>
                 <TooltipContent>Upload customer data in CSV format to train models</TooltipContent>
               </ShadcnTooltip>
-
+            ) : (
               <ShadcnTooltip>
                 <TooltipTrigger asChild>
                   <Button
                     variant="outline"
                     className="h-auto py-4 flex flex-col gap-2 items-center justify-center"
-                    onClick={() => router.push('/models/comparison')}
+                    onClick={() => router.push('/reports')}
                   >
-                    <BarChart2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-sm font-medium">Compare Models</span>
+                    <BarChart2 className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">View Reports</span>
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent>Compare performance metrics across different models</TooltipContent>
+                <TooltipContent>Review and download generated model reports</TooltipContent>
               </ShadcnTooltip>
+            )}
 
-              <ShadcnTooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className="h-auto py-4 flex flex-col gap-2 items-center justify-center"
-                    onClick={() => router.push('/predictions/single')}
-                  >
-                    <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-                    <span className="text-sm font-medium">Make Prediction</span>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Predict churn probability for individual customers</TooltipContent>
-              </ShadcnTooltip>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+            <ShadcnTooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-2 items-center justify-center"
+                  onClick={() => router.push('/models/comparison')}
+                >
+                  <BarChart2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-sm font-medium">Compare Models</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Compare performance metrics across different models</TooltipContent>
+            </ShadcnTooltip>
+
+            <ShadcnTooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-auto py-4 flex flex-col gap-2 items-center justify-center"
+                  onClick={() => router.push('/predictions')}
+                >
+                  <Sparkles className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                  <span className="text-sm font-medium">Make Prediction</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Predict churn probability for individual customers</TooltipContent>
+            </ShadcnTooltip>
+          </div>
+        </CardContent>
+      </Card>
     </>
   );
 }

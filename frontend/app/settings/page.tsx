@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { useTheme } from 'next-themes';
-import { API_BASE_URL } from '@/lib/api';
+import { api } from '@/lib/api';
+import type { User as AuthUser } from '@/lib/auth';
 import { Camera, User } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -34,15 +35,19 @@ export default function SettingsPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSaveMessage(null);
+
     // Validate file type
     if (!file.type.startsWith('image/')) {
       setSaveMessage({ type: 'error', text: 'Please select an image file' });
+      e.target.value = '';
       return;
     }
 
     // Validate file size (max 2MB)
     if (file.size > 2 * 1024 * 1024) {
       setSaveMessage({ type: 'error', text: 'Image size must be less than 2MB' });
+      e.target.value = '';
       return;
     }
 
@@ -51,6 +56,7 @@ export default function SettingsPage() {
     reader.onloadend = () => {
       const base64String = reader.result as string;
       setAvatar(base64String);
+      e.target.value = '';
     };
     reader.readAsDataURL(file);
   };
@@ -62,41 +68,28 @@ export default function SettingsPage() {
     setSaveMessage(null);
 
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/settings`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-        body: JSON.stringify({
+      const updatedUser = await api.patch<AuthUser>(
+        '/auth/settings',
+        {
           email_notifications_enabled: emailNotifications,
           name: name.trim() || null,
           avatar: avatar || null,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to save profile settings');
-      }
-
-      const updatedUser = await response.json();
+        },
+        token
+      );
       
       // Update auth store with new user data
-      if (user) {
-        setAuth({
-          ...user,
-          name: updatedUser.name,
-          avatar: updatedUser.avatar,
-          email_notifications_enabled: updatedUser.email_notifications_enabled,
-        }, token);
-      }
+      setAuth(updatedUser, token);
 
       setSaveMessage({ type: 'success', text: 'Profile updated successfully' });
       
       setTimeout(() => setSaveMessage(null), 3000);
     } catch (error) {
       console.error('Error saving profile settings:', error);
-      setSaveMessage({ type: 'error', text: 'Failed to save profile settings' });
+      setSaveMessage({
+        type: 'error',
+        text: error instanceof Error ? error.message : 'Failed to save profile settings',
+      });
     } finally {
       setIsLoading(false);
     }

@@ -3,9 +3,9 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
-import { listUsers, deleteUser } from '@/lib/users';
+import { listUsers } from '@/lib/users';
 import type { User } from '@/lib/auth';
-import { User as UserIcon, Shield, ShieldAlert, Trash2, Search, Loader2 } from 'lucide-react';
+import { User as UserIcon, Shield, ShieldAlert, Search, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function UsersManagementPage() {
@@ -16,24 +16,10 @@ export default function UsersManagementPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   
-  // Delete modal
-  const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [deleteModalUser, setDeleteModalUser] = useState<User | null>(null);
+  // State removed
 
-  useEffect(() => {
-    if (!authLoading && (!user || user.role !== 'Admin')) {
-      router.push('/dashboard');
-      return;
-    }
-
-    if (token && user?.role === 'Admin') {
-      fetchUsers();
-    }
-  }, [user, token, authLoading, router]);
-
-  const fetchUsers = async () => {
+  const fetchUsers = useCallback(async () => {
     try {
-      setIsLoading(true);
       setError(null);
       const data = await listUsers(token!);
       setUsers(Array.isArray(data) ? data : []);
@@ -43,56 +29,55 @@ export default function UsersManagementPage() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [token]);
 
-  const handleDeleteUser = async (userId: string) => {
-    if (!token) return;
-
-    // Safety: cannot delete self
-    if (userId === user?.id) {
-      toast.error('You cannot delete your own account.');
+  useEffect(() => {
+    if (authLoading) {
       return;
     }
 
-    // Safety: cannot delete the last Admin
-    const targetUser = users.find(u => u.id === userId);
-    if (targetUser?.role === 'Admin') {
-      const adminCount = users.filter(u => u.role === 'Admin').length;
-      if (adminCount <= 1) {
-        toast.error('Cannot delete the last Admin account.');
-        setDeleteModalUser(null);
-        return;
-      }
+    if (!token || !user) {
+      router.push('/login');
+      return;
     }
 
-    try {
-      setActionLoading(userId);
-      await deleteUser(userId, token);
-      setDeleteModalUser(null);
-      toast.success(`User ${targetUser?.email || userId} has been deleted.`);
-      await fetchUsers();
-    } catch (err) {
-      console.error('Error deleting user:', err);
-      const message = err instanceof Error ? err.message : 'Failed to delete user';
-      toast.error(message);
-      setError(message);
-    } finally {
-      setActionLoading(null);
+    if (user.role !== 'Admin') {
+      router.push('/dashboard');
+      return;
     }
-  };
+
+    queueMicrotask(() => {
+      void fetchUsers();
+    });
+  }, [user, token, authLoading, router, fetchUsers]);
+
+  // handleDeleteUser removed
 
   // Client-side search: name, email, role — case-insensitive
   const filteredUsers = useMemo(() => {
-    if (!searchQuery.trim()) return users;
-    const q = searchQuery.toLowerCase().trim();
-    return users.filter(u =>
-      (u.name && u.name.toLowerCase().includes(q)) ||
-      u.email.toLowerCase().includes(q) ||
-      u.role.toLowerCase().includes(q)
-    );
-  }, [users, searchQuery]);
+    let result = users;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      result = users.filter(u =>
+        (u.name && u.name.toLowerCase().includes(q)) ||
+        u.email.toLowerCase().includes(q) ||
+        u.role.toLowerCase().includes(q)
+      );
+    }
+    
+    // Sort so the current user is at the top
+    if (user?.id) {
+      result = [...result].sort((a, b) => {
+        if (a.id === user.id) return -1;
+        if (b.id === user.id) return 1;
+        return 0;
+      });
+    }
+    
+    return result;
+  }, [users, searchQuery, user?.id]);
 
-  if (authLoading || isLoading) {
+  if (authLoading || (user?.role === 'Admin' && isLoading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -100,8 +85,18 @@ export default function UsersManagementPage() {
     );
   }
 
-  if (!user || user.role !== 'Admin') {
+  if (!user) {
     return null;
+  }
+
+  if (user.role !== 'Admin') {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-background">
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Redirecting to the dashboard...
+        </p>
+      </div>
+    );
   }
 
   return (
@@ -168,9 +163,6 @@ export default function UsersManagementPage() {
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
                       Created At
                     </th>
-                    <th scope="col" className="relative px-6 py-3">
-                      <span className="sr-only">Actions</span>
-                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-card divide-y divide-gray-200 dark:divide-border">
@@ -203,18 +195,10 @@ export default function UsersManagementPage() {
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {new Date(u.created_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        {u.id !== user.id ? (
-                          <button
-                            onClick={() => setDeleteModalUser(u)}
-                            className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                            title="Delete user"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <span className="text-gray-400 italic text-xs">Current User</span>
+                        {u.id === user.id && (
+                          <span className="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300">
+                            Current User
+                          </span>
                         )}
                       </td>
                     </tr>
@@ -233,64 +217,7 @@ export default function UsersManagementPage() {
         </div>
       </main>
 
-      {/* Delete Confirmation Modal */}
-      {deleteModalUser && (
-        <div className="fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-          <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={() => setDeleteModalUser(null)} aria-hidden="true"></div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white dark:bg-card rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white dark:bg-card px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <ShieldAlert className="h-6 w-6 text-red-600" aria-hidden="true" />
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-foreground" id="modal-title">
-                      Delete User
-                    </h3>
-                    <div className="mt-2">
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        Are you sure you want to delete the user <span className="font-semibold">{deleteModalUser.email}</span>? This action cannot be undone and will permanently remove all their data.
-                      </p>
-                      {deleteModalUser.role === 'Admin' && (
-                        <p className="mt-2 text-sm text-amber-600 dark:text-amber-400 font-medium">
-                          ⚠️ Warning: This user has Admin privileges.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-gray-50 dark:bg-muted px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteUser(deleteModalUser.id)}
-                  disabled={actionLoading === deleteModalUser.id}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm disabled:opacity-50"
-                >
-                  {actionLoading === deleteModalUser.id ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Deleting...
-                    </>
-                  ) : (
-                    'Delete User'
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDeleteModalUser(null)}
-                  disabled={actionLoading === deleteModalUser.id}
-                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-gray-600 shadow-sm px-4 py-2 bg-white dark:bg-transparent text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Delete Confirmation Modal removed */}
     </div>
   );
 }

@@ -112,7 +112,7 @@ export function CommandMenu({ open: controlledOpen, onOpenChange }: CommandMenuP
               Upload new dataset
             </CommandItem>
           )}
-          <CommandItem onSelect={() => handleSelect('/predictions/single')}>
+          <CommandItem onSelect={() => handleSelect('/predictions')}>
             <Sparkles className="mr-2 h-4 w-4" />
             Make a prediction
           </CommandItem>

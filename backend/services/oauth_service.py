@@ -195,7 +195,7 @@ class OAuthService:
         random_password = secrets.token_urlsafe(32)
         
         # Validate role
-        valid_roles = ["Admin", "Data_Scientist", "Analyst"]
+        valid_roles = ["Admin", "Analyst"]
         if default_role not in valid_roles:
             default_role = "Analyst"
         

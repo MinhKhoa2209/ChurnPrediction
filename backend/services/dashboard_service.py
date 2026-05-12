@@ -4,7 +4,7 @@ from typing import Dict, List, Optional
 from uuid import UUID
 
 import redis
-from sqlalchemy import func
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
 from backend.domain.models.customer_record import CustomerRecord
@@ -22,8 +22,10 @@ class DashboardService:
     def invalidate_cache(redis_client: redis.Redis, user_id: Optional[UUID] = None):
         try:
             if user_id:
-                cache_key = f"dashboard:metrics:{user_id}"
-                redis_client.delete(cache_key)
+                redis_client.delete(
+                    f"dashboard:metrics:{user_id}",
+                    f"dashboard:metrics:v2:{user_id}",
+                )
                 logger.info(f"Invalidated dashboard cache for user {user_id}")
             else:
                 pattern = "dashboard:metrics:*"
@@ -36,9 +38,11 @@ class DashboardService:
 
     def compute_dashboard_metrics(self, db: Session, user_id: Optional[UUID] = None) -> Dict:
         try:
-            query = db.query(CustomerRecord)
-            if user_id:
-                query = query.join(Dataset).filter(Dataset.user_id == user_id)
+            query = (
+                db.query(CustomerRecord)
+                .join(Dataset)
+                .filter(Dataset.status == "ready")
+            )
 
             total_customers = query.count()
 
@@ -82,9 +86,11 @@ class DashboardService:
 
     def get_churn_distribution(self, db: Session, user_id: Optional[UUID] = None) -> Dict:
         try:
-            query = db.query(CustomerRecord)
-            if user_id:
-                query = query.join(Dataset).filter(Dataset.user_id == user_id)
+            query = (
+                db.query(CustomerRecord)
+                .join(Dataset)
+                .filter(Dataset.status == "ready")
+            )
 
             churned_count = query.filter(CustomerRecord.churn.is_(True)).count()
             total_count = query.count()
@@ -110,16 +116,21 @@ class DashboardService:
             end_date = datetime.utcnow()
             start_date = end_date - timedelta(days=months * 30)
 
-            results = db.query(
-                func.date_trunc("month", CustomerRecord.created_at).label("month"),
-                func.count(CustomerRecord.id).label("total_count"),
-                func.sum(func.cast(CustomerRecord.churn, db.bind.dialect.BIGINT)).label(
-                    "churn_count"
-                ),
-            ).filter(CustomerRecord.created_at >= start_date, CustomerRecord.created_at <= end_date)
-
-            if user_id:
-                results = results.join(Dataset).filter(Dataset.user_id == user_id)
+            results = (
+                db.query(
+                    func.date_trunc("month", CustomerRecord.created_at).label("month"),
+                    func.count(CustomerRecord.id).label("total_count"),
+                    func.sum(
+                        case((CustomerRecord.churn.is_(True), 1), else_=0)
+                    ).label("churn_count"),
+                )
+                .join(Dataset)
+                .filter(
+                    Dataset.status == "ready",
+                    CustomerRecord.created_at >= start_date,
+                    CustomerRecord.created_at <= end_date,
+                )
+            )
 
             results = (
                 results.group_by(func.date_trunc("month", CustomerRecord.created_at))

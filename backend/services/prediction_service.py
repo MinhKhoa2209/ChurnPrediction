@@ -1,8 +1,10 @@
+import base64
 import hashlib
 import io
 import json
 import logging
 import time
+from datetime import datetime
 from typing import Any, Dict, Optional
 from uuid import UUID
 
@@ -76,17 +78,6 @@ class PredictionService:
     ) -> Prediction:
         start_time = time.time()
 
-        input_hash = self._hash_input(input_data)
-        cached_prediction = self._get_cached_prediction(model_version_id, input_hash)
-
-        if cached_prediction:
-            elapsed_ms = (time.time() - start_time) * 1000
-            logger.info(
-                f"Returning cached prediction for model {model_version_id} "
-                f"in {elapsed_ms:.2f}ms"
-            )
-            return cached_prediction
-
         model_version = db.query(ModelVersion).filter(ModelVersion.id == model_version_id).first()
 
         if not model_version:
@@ -96,6 +87,36 @@ class PredictionService:
             raise ModelNotFoundError(
                 f"Model version {model_version_id} is {model_version.status} and cannot be used for predictions"
             )
+
+        input_hash = self._hash_input(input_data)
+        cached_prediction_payload = self._get_cached_prediction_payload(model_version_id, input_hash)
+
+        if cached_prediction_payload:
+            prediction = Prediction(
+                user_id=user_id,
+                model_version_id=model_version_id,
+                input_features=input_data,
+                probability=cached_prediction_payload["probability"],
+                threshold=cached_prediction_payload["threshold"],
+                prediction=cached_prediction_payload["prediction"],
+                shap_values=cached_prediction_payload["shap_values"],
+                is_batch=False,
+                batch_id=None,
+                created_at=datetime.utcnow(),
+            )
+
+            if store_prediction:
+                db.add(prediction)
+                db.commit()
+                db.refresh(prediction)
+                logger.info(f"Stored cached prediction {prediction.id} in database")
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            logger.info(
+                f"Returning cached prediction payload for model {model_version_id} "
+                f"in {elapsed_ms:.2f}ms"
+            )
+            return prediction
 
         model = self._load_model(model_version)
 
@@ -136,11 +157,12 @@ class PredictionService:
                 model_version=model_version,
                 X_preprocessed=X_preprocessed,
                 input_data=input_data,
+                prediction_probability=churn_probability,
             )
         except Exception as e:
             logger.error(f"SHAP computation failed: {e}")
 
-            shap_values_dict = {}
+            shap_values_dict = self._default_shap_values(churn_probability)
 
         shap_elapsed_ms = (time.time() - shap_start_time) * 1000
         if shap_elapsed_ms > self.MAX_SHAP_COMPUTATION_TIME_MS:
@@ -159,6 +181,7 @@ class PredictionService:
             shap_values=shap_values_dict,
             is_batch=False,
             batch_id=None,
+            created_at=datetime.utcnow(),
         )
 
         if store_prediction:
@@ -185,6 +208,7 @@ class PredictionService:
         model_version: ModelVersion,
         X_preprocessed: np.ndarray,
         input_data: Dict[str, Any],
+        prediction_probability: float,
     ) -> Dict[str, Any]:
         try:
             preprocessing_config = (
@@ -199,89 +223,47 @@ class PredictionService:
                 )
 
             feature_names = preprocessing_config.feature_columns
+            background = self._build_shap_background(X_preprocessed)
+            predict_fn = self._create_probability_predictor(model)
 
             if model_version.model_type == "DecisionTree":
-                explainer = shap.TreeExplainer(model)
-                shap_values = explainer.shap_values(X_preprocessed)
-
-                if isinstance(shap_values, list):
-                    shap_values = shap_values[1]
-
-                base_value = explainer.expected_value
-                if isinstance(base_value, (list, np.ndarray)):
-                    base_value = (
-                        float(base_value[1]) if len(base_value) > 1 else float(base_value[0])
-                    )
-                else:
-                    base_value = float(base_value)
-
-            else:
-                background = X_preprocessed
-
-                def predict_fn(X):
-                    return model.predict_proba(X)[:, 1]
-
-                explainer = shap.KernelExplainer(predict_fn, background)
-
-                shap_values = explainer.shap_values(X_preprocessed, nsamples=100)
-
-                base_value = float(explainer.expected_value)
-
-            if isinstance(shap_values, np.ndarray):
-                if len(shap_values.shape) > 1:
-                    shap_values_single = shap_values[0]
-                else:
-                    shap_values_single = shap_values
-            else:
-                shap_values_single = np.array(shap_values)
-
-            if len(shap_values_single.shape) > 1:
-                shap_values_single = shap_values_single.flatten()
-
-            feature_contributions = []
-            for i in range(len(feature_names)):
-                feature_name = feature_names[i]
-
-                feature_value = float(X_preprocessed[0, i])
-
-                shap_val = shap_values_single[i]
-                if isinstance(shap_val, np.ndarray):
-                    shap_contribution = float(shap_val.flatten()[0])
-                else:
-                    shap_contribution = float(shap_val)
-
-                feature_contributions.append(
-                    {
-                        "feature": feature_name,
-                        "value": feature_value,
-                        "contribution": shap_contribution,
-                        "direction": "positive" if shap_contribution > 0 else "negative",
-                    }
+                explainer = shap.TreeExplainer(
+                    model,
+                    data=background,
+                    model_output="probability",
+                    feature_perturbation="interventional",
                 )
+                shap_values = explainer.shap_values(X_preprocessed)
+                base_value = explainer.expected_value
 
-            feature_contributions.sort(key=lambda x: abs(x["contribution"]), reverse=True)
+            else:
+                explainer = shap.KernelExplainer(predict_fn, background)
+                shap_values = explainer.shap_values(X_preprocessed, nsamples=100)
+                base_value = explainer.expected_value
 
-            positive_contributors = [fc for fc in feature_contributions if fc["contribution"] > 0][
-                : self.TOP_CONTRIBUTORS_COUNT
-            ]
+            result = self._build_explanation_payload(
+                feature_names=feature_names,
+                X_preprocessed=X_preprocessed,
+                shap_values=shap_values,
+                base_value=base_value,
+                prediction_probability=prediction_probability,
+            )
 
-            negative_contributors = [fc for fc in feature_contributions if fc["contribution"] < 0][
-                : self.TOP_CONTRIBUTORS_COUNT
-            ]
-
-            shap_sum = sum(fc["contribution"] for fc in feature_contributions)
-            prediction_value = float(base_value + shap_sum)
-
-            result = {
-                "base_value": float(base_value),
-                "prediction_value": prediction_value,
-                "top_positive": positive_contributors,
-                "top_negative": negative_contributors,
-            }
+            if not self._is_explanation_valid(result, prediction_probability):
+                logger.warning(
+                    "SHAP explanation was empty or inconsistent for model %s. Falling back to local perturbation contributions.",
+                    model_version.id,
+                )
+                result = self._build_local_contribution_payload(
+                    model=model,
+                    feature_names=feature_names,
+                    X_preprocessed=X_preprocessed,
+                    prediction_probability=prediction_probability,
+                )
 
             logger.info(
                 f"Computed SHAP values for model {model_version.id}: "
-                f"{len(positive_contributors)} positive, {len(negative_contributors)} negative contributors"
+                f"{len(result['top_positive'])} positive, {len(result['top_negative'])} negative contributors"
             )
 
             return result
@@ -290,6 +272,172 @@ class PredictionService:
             logger.error(f"Failed to compute SHAP values: {e}", exc_info=True)
             raise SHAPComputationError(f"SHAP computation failed: {str(e)}")
 
+    def _build_shap_background(self, X_preprocessed: np.ndarray) -> np.ndarray:
+        return np.zeros((1, X_preprocessed.shape[1]), dtype=float)
+
+    def _create_probability_predictor(self, model: Any):
+        def predict_fn(X):
+            return model.predict_proba(X)[:, 1]
+
+        return predict_fn
+
+    def _build_explanation_payload(
+        self,
+        feature_names: list[str],
+        X_preprocessed: np.ndarray,
+        shap_values: Any,
+        base_value: Any,
+        prediction_probability: float,
+    ) -> Dict[str, Any]:
+        shap_values_single = self._extract_shap_vector(shap_values)
+        base_value_float = self._extract_expected_value(base_value)
+
+        if len(shap_values_single) != len(feature_names):
+            raise SHAPComputationError(
+                f"Feature contribution length mismatch: expected {len(feature_names)}, got {len(shap_values_single)}"
+            )
+
+        feature_contributions = self._build_feature_contributions(
+            feature_names=feature_names,
+            X_preprocessed=X_preprocessed,
+            contributions=shap_values_single,
+        )
+
+        prediction_value = float(base_value_float + sum(shap_values_single))
+
+        return self._format_explanation_payload(
+            base_value=base_value_float,
+            prediction_value=prediction_value,
+            feature_contributions=feature_contributions,
+        )
+
+    def _build_local_contribution_payload(
+        self,
+        model: Any,
+        feature_names: list[str],
+        X_preprocessed: np.ndarray,
+        prediction_probability: float,
+    ) -> Dict[str, Any]:
+        baseline = self._build_shap_background(X_preprocessed)
+        base_probability = float(model.predict_proba(baseline)[0, 1])
+
+        raw_contributions = []
+        for index in range(len(feature_names)):
+            perturbed = baseline.copy()
+            perturbed[0, index] = X_preprocessed[0, index]
+            feature_probability = float(model.predict_proba(perturbed)[0, 1])
+            raw_contributions.append(feature_probability - base_probability)
+
+        total_delta = prediction_probability - base_probability
+        raw_total = float(sum(raw_contributions))
+
+        if abs(raw_total) > 1e-9:
+            scale = total_delta / raw_total
+            normalized_contributions = [contribution * scale for contribution in raw_contributions]
+        else:
+            normalized_contributions = raw_contributions
+
+        feature_contributions = self._build_feature_contributions(
+            feature_names=feature_names,
+            X_preprocessed=X_preprocessed,
+            contributions=np.array(normalized_contributions),
+        )
+
+        return self._format_explanation_payload(
+            base_value=base_probability,
+            prediction_value=prediction_probability,
+            feature_contributions=feature_contributions,
+        )
+
+    def _build_feature_contributions(
+        self,
+        feature_names: list[str],
+        X_preprocessed: np.ndarray,
+        contributions: np.ndarray,
+    ) -> list[Dict[str, Any]]:
+        feature_contributions = []
+        for index, feature_name in enumerate(feature_names):
+            contribution = float(contributions[index])
+            feature_contributions.append(
+                {
+                    "feature": feature_name,
+                    "value": float(X_preprocessed[0, index]),
+                    "contribution": contribution,
+                    "direction": "positive" if contribution > 0 else "negative",
+                }
+            )
+
+        return feature_contributions
+
+    def _format_explanation_payload(
+        self,
+        base_value: float,
+        prediction_value: float,
+        feature_contributions: list[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        feature_contributions.sort(key=lambda item: abs(item["contribution"]), reverse=True)
+        positive_contributors = [
+            contribution
+            for contribution in feature_contributions
+            if contribution["contribution"] > 0
+        ][: self.TOP_CONTRIBUTORS_COUNT]
+        negative_contributors = [
+            contribution
+            for contribution in feature_contributions
+            if contribution["contribution"] < 0
+        ][: self.TOP_CONTRIBUTORS_COUNT]
+
+        return {
+            "base_value": float(base_value),
+            "prediction_value": float(prediction_value),
+            "top_positive": positive_contributors,
+            "top_negative": negative_contributors,
+        }
+
+    def _extract_shap_vector(self, shap_values: Any) -> np.ndarray:
+        if isinstance(shap_values, list):
+            selected_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+            shap_array = np.asarray(selected_values, dtype=float)
+        else:
+            shap_array = np.asarray(shap_values, dtype=float)
+            if shap_array.ndim == 3 and shap_array.shape[-1] > 1:
+                shap_array = shap_array[:, :, 1]
+
+        if shap_array.ndim == 0:
+            return np.array([float(shap_array)])
+        if shap_array.ndim == 1:
+            return shap_array.astype(float)
+
+        return shap_array[0].astype(float).flatten()
+
+    def _extract_expected_value(self, expected_value: Any) -> float:
+        if isinstance(expected_value, (list, np.ndarray)):
+            expected_array = np.asarray(expected_value, dtype=float).flatten()
+            if len(expected_array) > 1:
+                return float(expected_array[1])
+            return float(expected_array[0])
+        return float(expected_value)
+
+    def _is_explanation_valid(
+        self, explanation_payload: Dict[str, Any], prediction_probability: float
+    ) -> bool:
+        contributions = explanation_payload.get("top_positive", []) + explanation_payload.get(
+            "top_negative", []
+        )
+        has_signal = any(abs(item["contribution"]) > 1e-6 for item in contributions)
+        prediction_value = float(
+            explanation_payload.get("prediction_value", explanation_payload.get("base_value", 0.0))
+        )
+        return has_signal and abs(prediction_value - prediction_probability) <= 0.05
+
+    def _default_shap_values(self, prediction_probability: float) -> Dict[str, Any]:
+        return {
+            "base_value": float(prediction_probability),
+            "prediction_value": float(prediction_probability),
+            "top_positive": [],
+            "top_negative": [],
+        }
+
     def _load_model(self, model_version: ModelVersion) -> Any:
         model_cache_key = f"model:{model_version.id}"
 
@@ -297,6 +445,9 @@ class PredictionService:
             try:
                 cached_model_bytes = self.redis_client.get(model_cache_key)
                 if cached_model_bytes:
+                    if isinstance(cached_model_bytes, str):
+                        cached_model_bytes = base64.b64decode(cached_model_bytes.encode("ascii"))
+
                     model = joblib.load(io.BytesIO(cached_model_bytes))
                     logger.info(f"Loaded model {model_version.id} from cache")
                     return model
@@ -315,7 +466,9 @@ class PredictionService:
                     model_buffer.seek(0)
 
                     self.redis_client.setex(
-                        model_cache_key, self.MODEL_CACHE_TTL, model_buffer.read()
+                        model_cache_key,
+                        self.MODEL_CACHE_TTL,
+                        base64.b64encode(model_buffer.read()).decode("ascii"),
                     )
                     logger.info(f"Cached model {model_version.id} for {self.MODEL_CACHE_TTL}s")
                 except Exception as e:
@@ -331,9 +484,9 @@ class PredictionService:
         sorted_input = json.dumps(input_data, sort_keys=True)
         return hashlib.sha256(sorted_input.encode()).hexdigest()
 
-    def _get_cached_prediction(
+    def _get_cached_prediction_payload(
         self, model_version_id: UUID, input_hash: str
-    ) -> Optional[Prediction]:
+    ) -> Optional[Dict[str, Any]]:
         if not self._cache_enabled:
             return None
 
@@ -343,24 +496,14 @@ class PredictionService:
             cached_data = self.redis_client.get(cache_key)
             if cached_data:
                 prediction_dict = json.loads(cached_data)
-
-                prediction = Prediction(
-                    id=UUID(prediction_dict["id"]),
-                    user_id=UUID(prediction_dict["user_id"]),
-                    model_version_id=UUID(prediction_dict["model_version_id"]),
-                    input_features=prediction_dict["input_features"],
-                    probability=prediction_dict["probability"],
-                    threshold=prediction_dict["threshold"],
-                    prediction=prediction_dict["prediction"],
-                    shap_values=prediction_dict["shap_values"],
-                    is_batch=prediction_dict["is_batch"],
-                    batch_id=(
-                        UUID(prediction_dict["batch_id"]) if prediction_dict["batch_id"] else None
-                    ),
-                )
-
                 logger.info(f"Cache hit for prediction: {cache_key}")
-                return prediction
+                return {
+                    "probability": float(prediction_dict["probability"]),
+                    "threshold": float(prediction_dict["threshold"]),
+                    "prediction": bool(prediction_dict["prediction"]),
+                    "shap_values": prediction_dict.get("shap_values")
+                    or self._default_shap_values(float(prediction_dict["probability"])),
+                }
         except Exception as e:
             logger.warning(f"Failed to retrieve cached prediction: {e}")
 
@@ -376,16 +519,10 @@ class PredictionService:
 
         try:
             prediction_dict = {
-                "id": str(prediction.id),
-                "user_id": str(prediction.user_id),
-                "model_version_id": str(prediction.model_version_id),
-                "input_features": prediction.input_features,
                 "probability": prediction.probability,
                 "threshold": prediction.threshold,
                 "prediction": prediction.prediction,
                 "shap_values": prediction.shap_values,
-                "is_batch": prediction.is_batch,
-                "batch_id": str(prediction.batch_id) if prediction.batch_id else None,
             }
 
             self.redis_client.setex(

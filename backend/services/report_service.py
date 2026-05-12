@@ -2,7 +2,7 @@ import io
 import logging
 import time
 from datetime import datetime
-from typing import Dict, Optional
+from typing import Any, Optional
 from uuid import UUID, uuid4
 
 import matplotlib
@@ -26,9 +26,12 @@ from reportlab.platypus import (
 )
 from sqlalchemy.orm import Session
 
+from backend.domain.models.customer_record import CustomerRecord
 from backend.domain.models.model_version import ModelVersion
 from backend.domain.models.report import Report
 from backend.infrastructure.storage import storage_client
+from backend.services.ml_training_service import MLTrainingService
+from backend.services.model_evaluation_service import ModelEvaluationService
 
 logger = logging.getLogger(__name__)
 
@@ -48,14 +51,47 @@ class ReportService:
         try:
             model_version = (
                 db.query(ModelVersion)
-                .filter(ModelVersion.id == model_version_id, ModelVersion.user_id == user_id)
+                .filter(ModelVersion.id == model_version_id)
                 .first()
             )
 
             if not model_version:
                 raise ValueError(f"Model version {model_version_id} not found")
 
+            metrics = model_version.metrics or {}
             report_id = uuid4()
+
+            total_customers = (
+                db.query(CustomerRecord)
+                .filter(CustomerRecord.dataset_id == model_version.dataset_id)
+                .count()
+            )
+            churned_customers = (
+                db.query(CustomerRecord)
+                .filter(
+                    CustomerRecord.dataset_id == model_version.dataset_id,
+                    CustomerRecord.churn.is_(True),
+                )
+                .count()
+            )
+            churn_rate = (churned_customers / total_customers * 100) if total_customers > 0 else 0
+
+            roc_curve_data = None
+            if include_roc_curve:
+                try:
+                    roc_curve_data = ModelEvaluationService.compute_roc_curve(
+                        db=db, version_id=model_version_id, user_id=None
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Skipping ROC curve in report for model %s: %s",
+                        model_version_id,
+                        exc,
+                    )
+
+            feature_importance = None
+            if include_feature_importance:
+                feature_importance = self._extract_feature_importance(model_version)
 
             pdf_buffer = io.BytesIO()
             doc = SimpleDocTemplate(
@@ -89,39 +125,24 @@ class ReportService:
 
             story.append(Paragraph("Customer Churn Prediction Report", title_style))
             story.append(Spacer(1, 0.2 * inch))
-
             story.append(Paragraph("Executive Summary", heading_style))
-
-            from backend.domain.models.customer_record import CustomerRecord
-
-            total_customers = (
-                db.query(CustomerRecord).filter(CustomerRecord.user_id == user_id).count()
-            )
-
-            churned_customers = (
-                db.query(CustomerRecord)
-                .filter(CustomerRecord.user_id == user_id, CustomerRecord.churn.is_(True))
-                .count()
-            )
-
-            churn_rate = (churned_customers / total_customers * 100) if total_customers > 0 else 0
 
             summary_data = [
                 ["Metric", "Value"],
                 ["Report Generated", datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")],
                 ["Model Type", model_version.model_type],
                 ["Model Version", str(model_version.version)],
+                ["Dataset ID", str(model_version.dataset_id)],
                 ["Total Customers", f"{total_customers:,}"],
                 ["Churn Rate", f"{churn_rate:.2f}%"],
+                ["Model Accuracy", self._format_metric(metrics.get("accuracy"))],
+                ["Model F1-Score", self._format_metric(metrics.get("f1_score"))],
                 [
-                    "Model Accuracy",
-                    f"{model_version.accuracy:.4f}" if model_version.accuracy else "N/A",
+                    "Training Date",
+                    model_version.trained_at.strftime("%Y-%m-%d")
+                    if model_version.trained_at
+                    else "N/A",
                 ],
-                [
-                    "Model F1-Score",
-                    f"{model_version.f1_score:.4f}" if model_version.f1_score else "N/A",
-                ],
-                ["Training Date", model_version.created_at.strftime("%Y-%m-%d")],
             ]
 
             summary_table = Table(summary_data, colWidths=[2.5 * inch, 3 * inch])
@@ -142,19 +163,16 @@ class ReportService:
 
             story.append(summary_table)
             story.append(Spacer(1, 0.3 * inch))
-
             story.append(Paragraph("Model Performance Metrics", heading_style))
 
             metrics_data = [
                 ["Metric", "Value"],
-                ["Accuracy", f"{model_version.accuracy:.4f}" if model_version.accuracy else "N/A"],
-                [
-                    "Precision",
-                    f"{model_version.precision:.4f}" if model_version.precision else "N/A",
-                ],
-                ["Recall", f"{model_version.recall:.4f}" if model_version.recall else "N/A"],
-                ["F1-Score", f"{model_version.f1_score:.4f}" if model_version.f1_score else "N/A"],
-                ["ROC-AUC", f"{model_version.roc_auc:.4f}" if model_version.roc_auc else "N/A"],
+                ["Accuracy", self._format_metric(metrics.get("accuracy"))],
+                ["Precision", self._format_metric(metrics.get("precision"))],
+                ["Recall", self._format_metric(metrics.get("recall"))],
+                ["F1-Score", self._format_metric(metrics.get("f1_score"))],
+                ["ROC-AUC", self._format_metric(metrics.get("roc_auc"))],
+                ["Training Time", f"{model_version.training_time_seconds:.2f}s"],
             ]
 
             metrics_table = Table(metrics_data, colWidths=[2.5 * inch, 3 * inch])
@@ -185,22 +203,22 @@ class ReportService:
                     story.append(Image(cm_image, width=4 * inch, height=4 * inch))
                     story.append(Spacer(1, 0.2 * inch))
 
-            if include_roc_curve and model_version.roc_curve_data:
+            if include_roc_curve and roc_curve_data:
                 story.append(PageBreak())
                 story.append(Paragraph("ROC Curve", heading_style))
 
                 roc_image = self._generate_roc_curve_image(
-                    model_version.roc_curve_data, model_version.roc_auc
+                    roc_curve_data, float(metrics.get("roc_auc", 0.0))
                 )
                 if roc_image:
                     story.append(Image(roc_image, width=5 * inch, height=4 * inch))
                     story.append(Spacer(1, 0.2 * inch))
 
-            if include_feature_importance and model_version.feature_importance:
+            if include_feature_importance and feature_importance:
                 story.append(PageBreak())
                 story.append(Paragraph("Feature Importance", heading_style))
 
-                fi_image = self._generate_feature_importance_image(model_version.feature_importance)
+                fi_image = self._generate_feature_importance_image(feature_importance)
                 if fi_image:
                     story.append(Image(fi_image, width=5 * inch, height=4 * inch))
                     story.append(Spacer(1, 0.2 * inch))
@@ -213,10 +231,11 @@ class ReportService:
             elapsed_time = time.time() - start_time
             if elapsed_time > 10.0:
                 logger.warning(
-                    f"Report generation took {elapsed_time:.2f}s, " f"exceeding 10-second target"
+                    "Report generation took %.2fs, exceeding 10-second target",
+                    elapsed_time,
                 )
 
-            filename = f"model_report_{model_version.model_type}_v{model_version.version}.pdf"
+            filename = f"model_report_{model_version.model_type}_{report_id}.pdf"
             s3_key = storage_client.upload_report(
                 user_id=user_id, report_id=report_id, file_data=pdf_bytes, filename=filename
             )
@@ -227,8 +246,13 @@ class ReportService:
                 model_version_id=model_version_id,
                 report_type="model_evaluation",
                 file_path=s3_key,
-                file_size=len(pdf_bytes),
-                created_at=datetime.utcnow(),
+                report_metadata={
+                    "file_size": len(pdf_bytes),
+                    "filename": filename,
+                    "model_type": model_version.model_type,
+                    "version": model_version.version,
+                },
+                generated_at=datetime.utcnow(),
             )
 
             db.add(report)
@@ -236,8 +260,11 @@ class ReportService:
             db.refresh(report)
 
             logger.info(
-                f"Generated report {report_id} for model {model_version_id} "
-                f"in {elapsed_time:.2f}s, size={len(pdf_bytes)} bytes"
+                "Generated report %s for model %s in %.2fs, size=%s bytes",
+                report_id,
+                model_version_id,
+                elapsed_time,
+                len(pdf_bytes),
             )
 
             return report
@@ -246,20 +273,67 @@ class ReportService:
             logger.error(f"Error generating report: {e}", exc_info=True)
             raise RuntimeError(f"Failed to generate report: {e}")
 
-    def _generate_confusion_matrix_image(self, confusion_matrix: Dict) -> Optional[io.BytesIO]:
+    @staticmethod
+    def _format_metric(value: Optional[float]) -> str:
+        if value is None:
+            return "N/A"
+        return f"{float(value):.4f}"
+
+    def _extract_feature_importance(self, model_version: ModelVersion) -> Optional[dict[str, float]]:
         try:
-            cm = np.array(
-                [
-                    [
-                        confusion_matrix.get("true_negative", 0),
-                        confusion_matrix.get("false_positive", 0),
-                    ],
-                    [
-                        confusion_matrix.get("false_negative", 0),
-                        confusion_matrix.get("true_positive", 0),
-                    ],
-                ]
+            model = MLTrainingService.load_model_from_storage(model_version)
+            importances = getattr(model, "feature_importances_", None)
+            feature_names = (
+                model_version.preprocessing_config.feature_columns
+                if model_version.preprocessing_config
+                else None
             )
+
+            if importances is None or not feature_names:
+                return None
+
+            if len(importances) != len(feature_names):
+                logger.warning(
+                    "Feature importance length mismatch for model %s: %s != %s",
+                    model_version.id,
+                    len(importances),
+                    len(feature_names),
+                )
+                return None
+
+            return {
+                str(feature_names[index]): float(importances[index])
+                for index in range(len(feature_names))
+            }
+        except Exception as exc:
+            logger.warning(
+                "Skipping feature importance in report for model %s: %s",
+                model_version.id,
+                exc,
+            )
+            return None
+
+    def _generate_confusion_matrix_image(self, confusion_matrix: Any) -> Optional[io.BytesIO]:
+        try:
+            if isinstance(confusion_matrix, dict):
+                cm = np.array(
+                    [
+                        [
+                            confusion_matrix.get("true_negative", 0),
+                            confusion_matrix.get("false_positive", 0),
+                        ],
+                        [
+                            confusion_matrix.get("false_negative", 0),
+                            confusion_matrix.get("true_positive", 0),
+                        ],
+                    ]
+                )
+            else:
+                cm = np.array(confusion_matrix, dtype=int)
+
+            if cm.shape != (2, 2):
+                logger.warning("Unexpected confusion matrix shape: %s", cm.shape)
+                return None
 
             fig, ax = plt.subplots(figsize=(6, 6))
             im = ax.imshow(cm, interpolation="nearest", cmap=plt.cm.Blues)
@@ -275,13 +349,13 @@ class ReportService:
                 xlabel="Predicted label",
             )
 
-            thresh = cm.max() / 2.0
+            thresh = cm.max() / 2.0 if cm.size else 0
             for i in range(cm.shape[0]):
                 for j in range(cm.shape[1]):
                     ax.text(
                         j,
                         i,
-                        format(cm[i, j], "d"),
+                        format(int(cm[i, j]), "d"),
                         ha="center",
                         va="center",
                         color="white" if cm[i, j] > thresh else "black",
@@ -301,11 +375,16 @@ class ReportService:
             return None
 
     def _generate_roc_curve_image(
-        self, roc_curve_data: Dict, roc_auc: float
+        self, roc_curve_data: dict[str, Any], roc_auc: float
     ) -> Optional[io.BytesIO]:
         try:
-            fpr = roc_curve_data.get("fpr", [])
-            tpr = roc_curve_data.get("tpr", [])
+            if "points" in roc_curve_data:
+                points = roc_curve_data.get("points", [])
+                fpr = [point.get("fpr", 0.0) for point in points]
+                tpr = [point.get("tpr", 0.0) for point in points]
+            else:
+                fpr = roc_curve_data.get("fpr", [])
+                tpr = roc_curve_data.get("tpr", [])
 
             if not fpr or not tpr:
                 return None
@@ -334,7 +413,9 @@ class ReportService:
             logger.error(f"Error generating ROC curve image: {e}")
             return None
 
-    def _generate_feature_importance_image(self, feature_importance: Dict) -> Optional[io.BytesIO]:
+    def _generate_feature_importance_image(
+        self, feature_importance: dict[str, float]
+    ) -> Optional[io.BytesIO]:
         try:
             sorted_features = sorted(feature_importance.items(), key=lambda x: x[1], reverse=True)[
                 :15

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import {
   createSinglePrediction,
-  getProbabilityColor,
   type PredictionInput,
   type PredictionResponse,
 } from '@/lib/predictions';
@@ -20,11 +19,11 @@ export default function PredictionsPage() {
 
   const [modelVersions, setModelVersions] = useState<ModelVersionListItem[]>([]);
   const [selectedModelId, setSelectedModelId] = useState<string>('');
-  const [formData, setFormData] = useState<PredictionInput | null>(null);
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [isLoadingModels, setIsLoadingModels] = useState(true);
   const [isPredicting, setIsPredicting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const selectedModel = modelVersions.find((model) => model.id === selectedModelId);
 
   useEffect(() => {
     if (!token) return;
@@ -60,7 +59,6 @@ export default function PredictionsPage() {
     try {
       setIsPredicting(true);
       setError(null);
-      setFormData(input);
 
       const result = await createSinglePrediction(
         {
@@ -82,13 +80,18 @@ export default function PredictionsPage() {
 
   const handleReset = () => {
     setPrediction(null);
-    setFormData(null);
     setError(null);
   };
 
   const handleBackToDashboard = () => {
     router.push('/dashboard');
   };
+
+  const formatMetric = (value?: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toFixed(3) : 'N/A';
+
+  const formatThreshold = (value?: number) =>
+    typeof value === 'number' && Number.isFinite(value) ? value.toFixed(2) : 'N/A';
 
   if (authLoading) {
     return (
@@ -168,7 +171,7 @@ export default function PredictionsPage() {
                 >
                   {modelVersions.map((model) => (
                     <option key={model.id} value={model.id}>
-                      {model.model_type} - v{model.version.slice(0, 8)} (F1: {model.metrics.f1_score.toFixed(3)}, Accuracy: {model.metrics.accuracy.toFixed(3)})
+                      {model.model_type} - v{model.version.slice(0, 8)} (F1: {formatMetric(model.metrics?.f1_score)}, Accuracy: {formatMetric(model.metrics?.accuracy)})
                     </option>
                   ))}
                 </select>
@@ -177,10 +180,10 @@ export default function PredictionsPage() {
                   <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
                     <p className="text-sm text-blue-800 dark:text-blue-200">
                       <strong>Selected Model:</strong>{' '}
-                      {modelVersions.find((m) => m.id === selectedModelId)?.model_type}
+                      {selectedModel?.model_type ?? 'Unknown'}
                     </p>
                     <p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-                      Threshold: {modelVersions.find((m) => m.id === selectedModelId)?.classification_threshold.toFixed(2)}
+                      Threshold: {formatThreshold(selectedModel?.classification_threshold)}
                     </p>
                   </div>
                 )}
@@ -214,7 +217,6 @@ export default function PredictionsPage() {
                 <PredictionResult
                   prediction={prediction}
                   onReset={handleReset}
-                  userRole={user.role}
                 />
               ) : (
                 <div className="bg-white dark:bg-card shadow rounded-lg p-6 h-full flex items-center justify-center">
@@ -224,7 +226,7 @@ export default function PredictionsPage() {
                     />
                     <p className="text-lg font-medium">No Prediction Yet</p>
                     <p className="text-sm mt-2">
-                      Fill out the customer information form and click "Predict Churn" to see results
+                      Fill out the customer information form and click &quot;Predict Churn&quot; to see results
                     </p>
                   </div>
                 </div>

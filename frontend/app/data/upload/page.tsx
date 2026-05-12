@@ -7,6 +7,7 @@ import { useDatasetStore, Dataset } from '@/lib/store/dataset-store';
 import { FileUpload } from '@/components/data';
 import { DatasetProgressTracker } from '@/components/data/DatasetProgressTracker';
 import { api } from '@/lib/api';
+import { showErrorToast } from '@/lib/errors';
 
 export default function DataUploadPage() {
   const router = useRouter();
@@ -22,6 +23,7 @@ export default function DataUploadPage() {
     setUploadError,
     resetUpload,
     addDataset,
+    updateDataset,
   } = useDatasetStore();
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -56,19 +58,30 @@ export default function DataUploadPage() {
 
       addDataset(response);
       setCurrentDataset(response);
-
-      // Show progress tracker after upload completes
-      setProcessingDatasetId(response.id);
-      setShowProgress(true);
       setSelectedFile(null);
       setUploadProgress(100);
       setUploading(false);
-      
-      console.log(`[Upload] Now tracking processing for dataset: ${response.id}`);
+
+      if (response.status === 'processing') {
+        setProcessingDatasetId(response.id);
+        setShowProgress(true);
+        console.log(`[Upload] Now tracking processing for dataset: ${response.id}`);
+        return;
+      }
+
+      setProcessingDatasetId(null);
+      setShowProgress(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Upload failed';
       console.error(`[Upload] Upload failed:`, error);
+      setShowProgress(false);
+      setProcessingDatasetId(null);
+      setUploadProgress(0);
       setUploadError(errorMessage);
+      if (error instanceof Error) {
+        showErrorToast(error);
+      }
+
       setUploading(false);
     }
   };
@@ -279,12 +292,26 @@ export default function DataUploadPage() {
                         <p>Status: {currentDataset.status}</p>
                       </div>
                       <div className="mt-4">
-                        <button
-                          onClick={() => router.push(`/models/training?dataset=${currentDataset.id}`)}
-                          className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
-                        >
-                          Train Models
-                        </button>
+                        <div className="flex flex-wrap gap-3">
+                          <button
+                            onClick={() => router.push(`/data/eda/${currentDataset.id}`)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            Open EDA
+                          </button>
+                          <button
+                            onClick={() => router.push(`/data/processing?dataset=${currentDataset.id}`)}
+                            className="inline-flex items-center px-4 py-2 border border-green-300 text-sm font-medium rounded-md text-green-800 bg-white hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            View Processing
+                          </button>
+                          <button
+                            onClick={() => router.push(`/models/training?dataset=${currentDataset.id}`)}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                          >
+                            Train Models
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -297,12 +324,15 @@ export default function DataUploadPage() {
                   datasetId={processingDatasetId}
                   token={token}
                   onComplete={() => {
+                    if (processingDatasetId) {
+                      updateDataset(processingDatasetId, {
+                        status: 'ready',
+                        message: 'Dataset processing complete. The dataset is ready for EDA and training.',
+                      });
+                    }
                     setShowProgress(false);
                     setUploadError(null);
-                    // Show success message briefly before redirect
-                    setTimeout(() => {
-                      router.push(`/data/eda/${processingDatasetId}`);
-                    }, 1500);
+                    setProcessingDatasetId(null);
                   }}
                   onError={(error) => {
                     setUploadError(`Processing failed: ${error}`);

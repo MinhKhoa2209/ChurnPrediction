@@ -86,6 +86,15 @@ async def create_single_prediction(
             created_at=prediction.created_at.isoformat(),
         )
 
+        try:
+            from backend.services.dashboard_service import DashboardService
+
+            DashboardService.invalidate_cache(redis_client, UUID(current_user.id))
+        except Exception as cache_error:
+            logger.warning(
+                f"Failed to invalidate dashboard cache for user {current_user.id}: {cache_error}"
+            )
+
         logger.info(
             f"User {current_user.id} created prediction {prediction.id} "
             f"with model {model_version_id}: probability={prediction.probability:.4f}"

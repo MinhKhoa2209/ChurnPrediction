@@ -22,6 +22,18 @@ from backend.services.audit_service import AuditService
 router = APIRouter(prefix="/oauth", tags=["OAuth Authentication"])
 
 
+def _get_frontend_callback_url(provider: str) -> str:
+    redirect_url = settings.oauth_redirect_url.rstrip("/")
+
+    if "{provider}" in redirect_url:
+        return redirect_url.format(provider=provider)
+
+    if redirect_url.endswith("/auth/callback"):
+        return f"{redirect_url}/{provider}"
+
+    return redirect_url
+
+
 @router.get(
     "/providers",
     summary="List available OAuth providers",
@@ -110,8 +122,7 @@ async def oauth_login(
     
     # Use backend callback URL (Google will redirect here, not to frontend)
     if not redirect_uri:
-        # Redirect to backend callback endpoint
-        redirect_uri = f"http://localhost:8000/api/v1/oauth/{provider}/callback"
+        redirect_uri = str(request.url_for("oauth_callback", provider=provider))
     
     # Redirect to OAuth provider
     return await client.authorize_redirect(request, redirect_uri)
@@ -165,7 +176,7 @@ async def oauth_callback(
             logger.error(f"OAuth provider '{provider}' not configured")
             # Redirect to frontend with error
             return RedirectResponse(
-                url=f"{settings.oauth_redirect_url}?error=provider_not_configured",
+                url=f"{_get_frontend_callback_url(provider)}?error=provider_not_configured",
                 status_code=status.HTTP_302_FOUND
             )
         
@@ -183,7 +194,7 @@ async def oauth_callback(
             logger.error("No email provided by OAuth provider")
             # Redirect to frontend with error
             return RedirectResponse(
-                url=f"{settings.oauth_redirect_url}?error=no_email",
+                url=f"{_get_frontend_callback_url(provider)}?error=no_email",
                 status_code=status.HTTP_302_FOUND
             )
         
@@ -218,7 +229,7 @@ async def oauth_callback(
         logger.info("JWT token generated successfully")
         
         # Redirect to frontend with token
-        frontend_url = f"{settings.oauth_redirect_url}?token={access_token}"
+        frontend_url = f"{_get_frontend_callback_url(provider)}?token={access_token}"
         logger.info(f"Redirecting to frontend: {frontend_url}")
         return RedirectResponse(url=frontend_url, status_code=status.HTTP_302_FOUND)
         
@@ -226,7 +237,7 @@ async def oauth_callback(
         logger.error(f"HTTPException during OAuth callback: {he.detail}")
         # Redirect to frontend with error
         return RedirectResponse(
-            url=f"{settings.oauth_redirect_url}?error=auth_failed",
+            url=f"{_get_frontend_callback_url(provider)}?error=auth_failed",
             status_code=status.HTTP_302_FOUND
         )
     except Exception as e:
@@ -242,6 +253,6 @@ async def oauth_callback(
         
         # Redirect to frontend with error
         return RedirectResponse(
-            url=f"{settings.oauth_redirect_url}?error=auth_failed",
+            url=f"{_get_frontend_callback_url(provider)}?error=auth_failed",
             status_code=status.HTTP_302_FOUND
         )

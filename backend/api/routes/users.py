@@ -2,6 +2,7 @@ from typing import Annotated, List
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, status, HTTPException
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from backend.api.dependencies import require_admin
@@ -89,7 +90,14 @@ async def delete_user(
                 detail="Cannot delete the last Admin account"
             )
 
-    db.delete(user)
-    db.commit()
+    try:
+        db.delete(user)
+        db.commit()
+    except SQLAlchemyError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user",
+        )
 
     return None

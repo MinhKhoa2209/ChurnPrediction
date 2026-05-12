@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 from uuid import UUID
 
@@ -14,13 +14,103 @@ VALID_MODEL_TYPES = {"KNN", "NaiveBayes", "DecisionTree", "SVM"}
 
 
 VALID_STATUSES = {"queued", "running", "completed", "failed"}
+STALE_QUEUED_TIMEOUT = timedelta(minutes=15)
+STALE_RUNNING_TIMEOUT = timedelta(hours=1)
 
 
 class TrainingService:
     @staticmethod
+    def _normalize_uuid(value: UUID | str | None) -> UUID | None:
+        if value is None or isinstance(value, UUID):
+            return value
+        return UUID(value)
+
+    @staticmethod
+    def _utc_like(reference_time: Optional[datetime]) -> datetime:
+        if reference_time and reference_time.tzinfo is not None:
+            return datetime.now(reference_time.tzinfo)
+        return datetime.utcnow()
+
+    @staticmethod
+    def reconcile_stale_jobs(
+        db: Session,
+        user_id: Optional[UUID] = None,
+        dataset_id: Optional[UUID] = None,
+        job_id: Optional[UUID] = None,
+    ) -> int:
+        from backend.domain.models.model_version import ModelVersion
+
+        user_id = TrainingService._normalize_uuid(user_id)
+        dataset_id = TrainingService._normalize_uuid(dataset_id)
+        job_id = TrainingService._normalize_uuid(job_id)
+        query = db.query(TrainingJob).filter(TrainingJob.status.in_(["queued", "running"]))
+
+        if user_id is not None:
+            query = query.filter(TrainingJob.user_id == user_id)
+
+        if dataset_id is not None:
+            query = query.filter(TrainingJob.dataset_id == dataset_id)
+
+        if job_id is not None:
+            query = query.filter(TrainingJob.id == job_id)
+
+        stale_jobs = query.all()
+        updated_count = 0
+
+        for job in stale_jobs:
+            reference_time = job.started_at or job.created_at
+            now = TrainingService._utc_like(reference_time)
+            timeout = STALE_RUNNING_TIMEOUT if job.status == "running" else STALE_QUEUED_TIMEOUT
+
+            if not reference_time or now - reference_time < timeout:
+                continue
+
+            matching_model = (
+                db.query(ModelVersion)
+                .filter(
+                    ModelVersion.user_id == job.user_id,
+                    ModelVersion.dataset_id == job.dataset_id,
+                    ModelVersion.model_type == job.model_type,
+                    ModelVersion.trained_at >= job.created_at,
+                )
+                .order_by(ModelVersion.trained_at.desc())
+                .first()
+            )
+
+            if matching_model:
+                job.status = "completed"
+                job.model_version_id = matching_model.id
+                job.progress_percent = 100
+                job.completed_at = matching_model.trained_at or now
+                job.error_message = None
+                logger.warning(
+                    "Reconciled stale training job %s as completed using model version %s",
+                    job.id,
+                    matching_model.id,
+                )
+            else:
+                job.status = "failed"
+                job.completed_at = now
+                job.error_message = (
+                    "Training job was interrupted before completion. Please start it again."
+                )
+                job.progress_percent = job.progress_percent or 0
+                logger.warning("Marked stale training job %s as failed", job.id)
+
+            updated_count += 1
+
+        if updated_count:
+            db.commit()
+
+        return updated_count
+
+    @staticmethod
     def create_training_job(
         db: Session, user_id: UUID, dataset_id: UUID, model_type: str
     ) -> TrainingJob:
+        user_id = TrainingService._normalize_uuid(user_id)
+        dataset_id = TrainingService._normalize_uuid(dataset_id)
+
         if model_type not in VALID_MODEL_TYPES:
             raise ValueError(
                 f"Invalid model_type '{model_type}'. Must be one of: {', '.join(VALID_MODEL_TYPES)}"
@@ -47,12 +137,15 @@ class TrainingService:
         return training_job
 
     @staticmethod
-    def get_training_job(db: Session, job_id: UUID, user_id: UUID) -> Optional[TrainingJob]:
-        return (
-            db.query(TrainingJob)
-            .filter(TrainingJob.id == job_id, TrainingJob.user_id == user_id)
-            .first()
-        )
+    def get_training_job(db: Session, job_id: UUID, user_id: Optional[UUID] = None) -> Optional[TrainingJob]:
+        job_id = TrainingService._normalize_uuid(job_id)
+        if user_id:
+            user_id = TrainingService._normalize_uuid(user_id)
+        TrainingService.reconcile_stale_jobs(db=db, user_id=user_id, job_id=job_id)
+        query = db.query(TrainingJob).filter(TrainingJob.id == job_id)
+        if user_id:
+            query = query.filter(TrainingJob.user_id == user_id)
+        return query.first()
 
     @staticmethod
     def get_job(db: Session, job_id: UUID) -> Optional[TrainingJob]:
@@ -61,14 +154,21 @@ class TrainingService:
 
     @staticmethod
     def list_training_jobs(
-        db: Session, user_id: UUID, status_filter: Optional[str] = None
+        db: Session, user_id: Optional[UUID] = None, status_filter: Optional[str] = None
     ) -> list[TrainingJob]:
+        if user_id:
+            user_id = TrainingService._normalize_uuid(user_id)
+
         if status_filter and status_filter not in VALID_STATUSES:
             raise ValueError(
                 f"Invalid status_filter '{status_filter}'. Must be one of: {', '.join(VALID_STATUSES)}"
             )
 
-        query = db.query(TrainingJob).filter(TrainingJob.user_id == user_id)
+        TrainingService.reconcile_stale_jobs(db=db, user_id=user_id)
+
+        query = db.query(TrainingJob)
+        if user_id:
+            query = query.filter(TrainingJob.user_id == user_id)
 
         if status_filter:
             query = query.filter(TrainingJob.status == status_filter)
@@ -135,6 +235,8 @@ class TrainingService:
 
     @staticmethod
     def delete_training_job(db: Session, job_id: UUID, user_id: UUID) -> bool:
+        job_id = TrainingService._normalize_uuid(job_id)
+        user_id = TrainingService._normalize_uuid(user_id)
         training_job = (
             db.query(TrainingJob)
             .filter(TrainingJob.id == job_id, TrainingJob.user_id == user_id)

@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     github_client_secret: Optional[str] = None
     microsoft_client_id: Optional[str] = None
     microsoft_client_secret: Optional[str] = None
-    oauth_redirect_url: str = "http://localhost:3000/api/auth/callback"
+    oauth_redirect_url: str = "http://localhost:3000/auth/callback/{provider}"
 
     encryption_key: str
 

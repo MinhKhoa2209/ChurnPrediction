@@ -59,9 +59,23 @@ def train_model_task(
             if not hyperparameters:
                 hyperparameters = None
 
-        TrainingService.update_job_status(db, job_uuid, status="running", progress=10)
-
         training_job = TrainingService.get_job(db, job_uuid)
+
+        def update_progress(
+            progress: int,
+            current_iteration: int | None = None,
+            total_iterations: int | None = None,
+        ) -> None:
+            TrainingService.update_job_status(
+                db,
+                job_uuid,
+                status="running",
+                progress=progress,
+                current_iteration=current_iteration,
+                total_iterations=total_iterations,
+            )
+
+        update_progress(10)
 
         model_version = MLTrainingService.train_model(
             db=db,
@@ -70,6 +84,7 @@ def train_model_task(
             model_type=model_type,
             hyperparameters=hyperparameters,
             optimize_hyperparameters=optimize_hyperparameters,
+            progress_callback=update_progress,
         )
 
         training_job.model_version_id = model_version.id

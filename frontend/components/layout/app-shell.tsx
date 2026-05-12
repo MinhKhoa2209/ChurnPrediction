@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
 import { AppSidebar } from './app-sidebar';
 import { AppHeader } from './app-header';
@@ -13,7 +12,6 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { user } = useAuthStore();
-  const [commandOpen, setCommandOpen] = useState(false);
 
   // Don't render the app shell for unauthenticated users
   if (!user) {
@@ -24,15 +22,15 @@ export function AppShell({ children }: AppShellProps) {
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <AppHeader onCommandMenuOpen={() => setCommandOpen(true)} />
+        <AppHeader />
         <main
           id="main-content"
-          className="flex flex-1 flex-col gap-4 p-4 md:p-6 pt-4"
+          className="flex min-w-0 flex-1 flex-col gap-4 overflow-x-hidden p-4 pt-4 md:p-6"
         >
           {children}
         </main>
       </SidebarInset>
-      <CommandMenu open={commandOpen} onOpenChange={setCommandOpen} />
+      <CommandMenu />
     </SidebarProvider>
   );
 }
