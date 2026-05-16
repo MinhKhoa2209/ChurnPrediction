@@ -10,8 +10,8 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
-lib64/
+/lib/
+/lib64/
 parts/
 sdist/
 var/
@@ -64,7 +64,7 @@ out/
 # Project specs (internal)
 .kiro/
 
-# Testing - Backend
+# Testing - Backend outputs
 .coverage
 .pytest_cache/
 htmlcov/
@@ -72,32 +72,13 @@ htmlcov/
 .hypothesis/
 coverage/
 coverage.xml
-*.test.py
-*_test.py
-test_*.py
-conftest.py
-pytest.ini
-.pytest.ini
 test.db
 test_*.db
 *_test.db
 
-# Testing - Frontend
-*.test.ts
-*.test.tsx
-*.spec.ts
-*.spec.tsx
-jest.config.js
-jest.setup.js
-playwright.config.ts
-__tests__/
-e2e/
-tests/
-
-# Testing - Root
-/tests/
-/test/
-/__tests__/
+# Testing - Frontend outputs
+playwright-report/
+test-results/
 test*.html
 *test*.html
 
@@ -112,13 +93,10 @@ logs/
 
 # ML artifacts
 mlruns/
-models/
+/models/
 *.joblib
 *.pkl
 *.h5
-
-# Docker
-.dockerignore
 
 # OS
 Thumbs.db
@@ -162,3 +140,9 @@ dmypy.json
 
 # TypeScript
 *.tsbuildinfo
+
+# Lighthouse reports
+lighthouse-report.*
+
+# Sentry
+.sentryclirc

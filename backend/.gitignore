@@ -27,7 +27,7 @@ env/
 ENV/
 .venv
 
-# Testing
+# Testing outputs
 .coverage
 .pytest_cache/
 htmlcov/
@@ -35,14 +35,6 @@ htmlcov/
 .hypothesis/
 coverage/
 coverage.xml
-*.test.py
-*_test.py
-test_*.py
-conftest.py
-pytest.ini
-.pytest.ini
-tests/
-test/
 
 # Test Databases
 test.db
@@ -70,7 +62,7 @@ logs/
 
 # ML artifacts
 mlruns/
-models/
+/models/
 *.joblib
 *.pkl
 *.h5

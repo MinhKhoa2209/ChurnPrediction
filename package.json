@@ -14,7 +14,9 @@
     "build:shared": "cd shared && npm run build",
     "build": "npm run build:shared && npm run build:frontend",
     "install:all": "npm install && cd frontend && npm install && cd ../shared && npm install",
-    "clean": "rm -rf frontend/.next frontend/out shared/dist backend/__pycache__"
+    "clean": "powershell -ExecutionPolicy Bypass -File scripts/cleanup.ps1 -Apply",
+    "clean:dry": "powershell -ExecutionPolicy Bypass -File scripts/cleanup.ps1",
+    "clean:sh": "sh scripts/cleanup.sh --apply"
   },
   "keywords": [
     "machine-learning",

@@ -143,7 +143,7 @@ export default function DataProcessingPage() {
         // Stop polling when done
         if (data.status === 'completed' || data.status === 'ready' || data.status === 'failed') {
           stopped = true;
-          clearInterval(intervalId);
+          if (intervalId) clearInterval(intervalId);
         }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message.toLowerCase() : '';
