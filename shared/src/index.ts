@@ -103,7 +103,6 @@ export interface ModelVersion {
   trainedAt: string;
   status: 'active' | 'archived';
   classificationThreshold: number;
-  mlflowRunId?: string;
 }
 
 // Training Job Types

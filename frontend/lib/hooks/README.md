@@ -36,44 +36,6 @@ function MyComponent() {
 }
 ```
 
-### `useApi`
-
-A hook for making API calls with automatic error handling and loading states.
-
-```typescript
-import { useApi } from '@/lib/hooks/useApi';
-
-function MyComponent() {
-  const { data, loading, error, execute } = useApi({
-    userId: user?.id,
-    userEmail: user?.email,
-    userRole: user?.role,
-  });
-
-  const fetchData = async () => {
-    await execute(
-      () => api.get('/endpoint', token),
-      {
-        onSuccess: (data) => {
-          console.log('Success:', data);
-        },
-        showToast: true,
-        reportToSentry: true,
-      }
-    );
-  };
-
-  return (
-    <div>
-      {loading && <p>Loading...</p>}
-      {error && <p>Error occurred</p>}
-      {data && <pre>{JSON.stringify(data, null, 2)}</pre>}
-      <button onClick={fetchData}>Fetch Data</button>
-    </div>
-  );
-}
-```
-
 ## API Interceptor
 
 For more advanced use cases, you can use the API interceptor directly:
@@ -168,9 +130,8 @@ Sentry.setUser({
 ## Best Practices
 
 1. **Always provide user context** when available for better error tracking
-2. **Use `useApi` hook** for simple API calls with loading states
-3. **Use `withErrorHandling`** for more control over error handling
-4. **Use `withRetry`** for operations that should be retried on failure
-5. **Don't retry** authentication, authorization, or validation errors
-6. **Show toasts** for user-facing errors, but not for background operations
-7. **Report to Sentry** for all unexpected errors, but not for expected validation errors
+2. **Use `withErrorHandling`** for more control over error handling
+3. **Use `withRetry`** for operations that should be retried on failure
+4. **Don't retry** authentication, authorization, or validation errors
+5. **Show toasts** for user-facing errors, but not for background operations
+6. **Report to Sentry** for all unexpected errors, but not for expected validation errors

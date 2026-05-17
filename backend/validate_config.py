@@ -48,11 +48,6 @@ try:
     print(f"  ✓ Exports Bucket: {summary['storage']['buckets']['exports']}")
     print()
 
-    print("MLflow:")
-    print(f"  ✓ Configured: {summary['mlflow']['configured']}")
-    print(f"  ✓ Experiment: {summary['mlflow']['experiment']}")
-    print()
-
     print("API:")
     print(f"  ✓ Prefix: {summary['api']['prefix']}")
     print(f"  ✓ CORS Origins: {summary['api']['cors_origins']}")

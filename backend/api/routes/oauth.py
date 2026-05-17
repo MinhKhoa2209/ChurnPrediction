@@ -1,7 +1,7 @@
 """
 OAuth Authentication Routes
 
-Endpoints for OAuth 2.0 authentication with external providers:
+Endpoints for Google OAuth 2.0 authentication:
 - GET /api/v1/oauth/{provider}/login - Initiate OAuth flow
 - GET /api/v1/oauth/{provider}/callback - Handle OAuth callback
 - GET /api/v1/oauth/providers - List available OAuth providers
@@ -37,7 +37,7 @@ def _get_frontend_callback_url(provider: str) -> str:
 @router.get(
     "/providers",
     summary="List available OAuth providers",
-    description="Get list of configured OAuth providers (Google, GitHub, Microsoft)"
+    description="Get Google OAuth configuration status"
 )
 async def list_oauth_providers():
     """
@@ -52,16 +52,6 @@ async def list_oauth_providers():
                 "enabled": bool(settings.google_client_id and settings.google_client_secret),
                 "name": "Google",
                 "icon": "google"
-            },
-            "github": {
-                "enabled": bool(settings.github_client_id and settings.github_client_secret),
-                "name": "GitHub",
-                "icon": "github"
-            },
-            "microsoft": {
-                "enabled": bool(settings.microsoft_client_id and settings.microsoft_client_secret),
-                "name": "Microsoft",
-                "icon": "microsoft"
             }
         }
     }
@@ -73,10 +63,8 @@ async def list_oauth_providers():
     description="""
     Redirect user to OAuth provider's login page.
     
-    **Supported Providers:**
+    **Supported Provider:**
     - google: Google OAuth 2.0
-    - github: GitHub OAuth
-    - microsoft: Microsoft OAuth 2.0
     
     **Flow:**
     1. User clicks "Sign in with Google" button
@@ -95,7 +83,7 @@ async def oauth_login(
     Initiate OAuth login flow
     
     Args:
-        provider: OAuth provider name (google, github, microsoft)
+        provider: OAuth provider name (google)
         request: HTTP request object
         redirect_uri: Optional custom redirect URI
         
@@ -106,7 +94,7 @@ async def oauth_login(
         HTTPException: If provider is not supported or not configured
     """
     # Validate provider
-    if provider not in ['google', 'github', 'microsoft']:
+    if provider != 'google':
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"Unsupported OAuth provider: {provider}"

@@ -73,7 +73,6 @@ class ModelVersionResponse(BaseModel):
     confusion_matrix: list[list[int]] = Field(..., description="Confusion matrix")
     training_time_seconds: float = Field(..., description="Training time in seconds")
     artifact_path: str = Field(..., description="Path to model artifact in R2 storage")
-    mlflow_run_id: Optional[str] = Field(None, description="MLflow run ID")
     status: str = Field(..., description="Model status (active, archived)")
     classification_threshold: float = Field(
         ..., description="Classification threshold (0.0 to 1.0)"
@@ -102,7 +101,6 @@ class ModelVersionResponse(BaseModel):
                 "confusion_matrix": [[850, 120], [95, 340]],
                 "training_time_seconds": 12.45,
                 "artifact_path": "models/770e8400-e29b-41d4-a716-446655440000/880e8400-e29b-41d4-a716-446655440000/model.joblib",
-                "mlflow_run_id": "abc123def456",
                 "status": "active",
                 "classification_threshold": 0.5,
                 "trained_at": "2024-01-15T10:30:45Z",

@@ -25,7 +25,6 @@ from sklearn.tree import DecisionTreeClassifier
 from sqlalchemy.orm import Session
 
 from backend.domain.models.model_version import ModelVersion
-from backend.infrastructure.mlflow_client import mlflow_tracker
 from backend.infrastructure.storage import storage_client
 from backend.services.preprocessing_service import PreprocessingService
 
@@ -156,20 +155,6 @@ class MLTrainingService:
         emit_progress(95)
 
         model_version.artifact_path = artifact_path
-
-        try:
-            mlflow_run_id = mlflow_tracker.log_model_training(
-                model_type=model_type,
-                model_version_id=model_version.id,
-                dataset_id=dataset_id,
-                hyperparameters=hyperparameters,
-                metrics=metrics,
-                training_time=training_time,
-                user_id=user_id,
-            )
-            model_version.mlflow_run_id = mlflow_run_id
-        except Exception as e:
-            logger.error(f"Failed to log to MLflow: {e}")
 
         db.commit()
         db.refresh(model_version)

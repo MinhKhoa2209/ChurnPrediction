@@ -9,7 +9,7 @@ FastAPI backend service for the Customer Churn Prediction Platform.
 - **Database**: PostgreSQL 18 with SQLAlchemy 2.x
 - **Cache**: Redis
 - **Task Queue**: Celery
-- **ML Libraries**: Scikit-learn, XGBoost, LightGBM, MLflow, Optuna, SHAP
+- **ML Libraries**: Scikit-learn, XGBoost, LightGBM, Optuna, SHAP
 - **Authentication**: JWT with bcrypt
 - **Object Storage**: Cloudflare R2 (S3-compatible via boto3)
 
@@ -77,8 +77,7 @@ backend/
 ├── infrastructure/        # External service integrations
 │   ├── database.py       # Database connection
 │   ├── cache.py          # Redis client
-│   ├── storage.py        # S3/R2 client
-│   └── mlflow_client.py  # MLflow integration
+│   └── storage.py        # S3/R2 client
 ├── workers/               # Celery background tasks
 ├── utils/                 # Utility functions
 └── tests/                 # Test suite

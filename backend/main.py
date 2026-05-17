@@ -45,7 +45,7 @@ openapi_tags_metadata = [
     },
     {
         "name": "OAuth Authentication",
-        "description": "OAuth 2.0 authentication endpoints. Sign in with Google, GitHub, or Microsoft accounts.",
+        "description": "OAuth 2.0 authentication endpoints. Sign in with Google.",
     },
     {
         "name": "Datasets",

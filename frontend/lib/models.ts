@@ -18,7 +18,6 @@ export interface ModelVersion {
   confusion_matrix: number[][];
   training_time_seconds: number;
   artifact_path: string;
-  mlflow_run_id: string | null;
   status: 'active' | 'archived';
   classification_threshold: number;
   trained_at: string;
@@ -158,4 +157,4 @@ export async function deleteTrainingJob(
   token: string
 ): Promise<void> {
   return api.delete(`/models/jobs/${jobId}`, token);
-}
+}

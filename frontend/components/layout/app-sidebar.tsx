@@ -61,7 +61,7 @@ const mainNavItems: NavItem[] = [
 const dataNavItems: NavItem[] = [
   { label: 'Data Upload', href: '/data/upload', icon: Upload, roles: ['Admin'] },
   { label: 'Data Processing', href: '/data/processing', icon: Activity, roles: ['Admin'] },
-  { label: 'Models', href: '/models', icon: BrainCircuit, roles: ['Admin', 'Analyst'] },
+  { label: 'Models', href: '/models/comparison', icon: BrainCircuit, roles: ['Admin', 'Analyst'] },
   { label: 'Predictions', href: '/predictions', icon: Sparkles, roles: ['Admin', 'Analyst'] },
   { label: 'Reports', href: '/reports', icon: FileBarChart2, roles: ['Admin', 'Analyst'] },
 ];

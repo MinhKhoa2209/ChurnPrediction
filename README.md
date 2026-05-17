@@ -38,7 +38,6 @@ The **Customer Churn Prediction Platform** is a comprehensive machine learning s
 - ✅ Cross-validation and performance metrics
 - ✅ Model comparison dashboard
 - ✅ Real-time training progress via WebSocket
-- ✅ MLflow integration for experiment tracking
 - ✅ Confusion matrix and ROC curve analysis
 
 ### 🎯 Predictions
@@ -109,7 +108,6 @@ The **Customer Churn Prediction Platform** is a comprehensive machine learning s
 | **LightGBM** | 4.5.0 | Gradient boosting |
 | **Optuna** | 4.1.0 | Hyperparameter optimization |
 | **SHAP** | 0.46.0 | Model explainability |
-| **MLflow** | 2.18.0 | Experiment tracking |
 | **imbalanced-learn** | 0.12.4 | Handle imbalanced data |
 
 ### Infrastructure
@@ -204,7 +202,6 @@ docker-compose logs -f
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000
 - API Docs: http://localhost:8000/docs
-- MLflow UI: http://localhost:5000
 - MinIO Console: http://localhost:9001
 
 **Default credentials:**
@@ -404,9 +401,6 @@ S3_BUCKET_MODELS=models
 S3_BUCKET_REPORTS=reports
 S3_BUCKET_EXPORTS=exports
 S3_REGION=auto
-
-# MLflow
-MLFLOW_TRACKING_URI=http://localhost:5000
 
 # Authentication
 JWT_SECRET_KEY=your-secret-key-min-32-chars

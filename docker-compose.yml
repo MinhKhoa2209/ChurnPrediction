@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:18-alpine
@@ -76,31 +74,6 @@ services:
     networks:
       - churn-network
 
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.18.0
-    container_name: churn-mlflow
-    command: >
-      mlflow server
-      --backend-store-uri sqlite:///mlflow/mlflow.db
-      --default-artifact-root s3://mlflow-artifacts/
-      --host 0.0.0.0
-      --port 5000
-    environment:
-      MLFLOW_S3_ENDPOINT_URL: http://minio:9000
-      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin123}
-    ports:
-      - "${MLFLOW_PORT:-5000}:5000"
-    volumes:
-      - mlflow_data:/mlflow
-    depends_on:
-      minio:
-        condition: service_healthy
-      minio-init:
-        condition: service_completed_successfully
-    networks:
-      - churn-network
-
   backend:
     build:
       context: ./backend
@@ -123,7 +96,6 @@ services:
       S3_BUCKET_REPORTS: reports
       S3_BUCKET_EXPORTS: exports
       S3_REGION: us-east-1
-      MLFLOW_TRACKING_URI: http://mlflow:5000
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
       JWT_ALGORITHM: HS256
       JWT_EXPIRATION_HOURS: 24
@@ -146,8 +118,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      mlflow:
-        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 10s
@@ -177,7 +147,6 @@ services:
       S3_BUCKET_REPORTS: reports
       S3_BUCKET_EXPORTS: exports
       S3_REGION: us-east-1
-      MLFLOW_TRACKING_URI: http://mlflow:5000
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-your-secret-key-change-in-production}
       JWT_ALGORITHM: HS256
       JWT_EXPIRATION_HOURS: 24
@@ -192,8 +161,6 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-      mlflow:
-        condition: service_started
     networks:
       - churn-network
 
@@ -224,8 +191,6 @@ volumes:
   redis_data:
     driver: local
   minio_data:
-    driver: local
-  mlflow_data:
     driver: local
 
 networks:

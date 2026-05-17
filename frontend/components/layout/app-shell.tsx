@@ -5,6 +5,7 @@ import { AppSidebar } from './app-sidebar';
 import { AppHeader } from './app-header';
 import { CommandMenu } from './command-menu';
 import { useAuthStore } from '@/lib/store/auth-store';
+import { usePathname } from 'next/navigation';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -12,9 +13,18 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   const { user } = useAuthStore();
+  const pathname = usePathname();
+  const isPublicAuthPage = [
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/admin/login',
+    '/auth/callback',
+  ].some(route => pathname.startsWith(route));
 
   // Don't render the app shell for unauthenticated users
-  if (!user) {
+  if (!user || isPublicAuthPage) {
     return <>{children}</>;
   }
 

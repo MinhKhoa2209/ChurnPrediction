@@ -62,7 +62,7 @@ if ($services -notmatch "Up") {
 }
 
 # Check individual service health
-$serviceNames = @("postgres", "redis", "minio", "mlflow", "backend")
+$serviceNames = @("postgres", "redis", "minio", "backend")
 $allHealthy = $true
 
 foreach ($service in $serviceNames) {
@@ -88,16 +88,6 @@ try {
 } catch {
     Write-Host "❌ Backend API is not responding" -ForegroundColor Red
     $allHealthy = $false
-}
-
-# MLflow health check
-try {
-    $response = Invoke-WebRequest -Uri "http://localhost:5000/health" -UseBasicParsing -TimeoutSec 5
-    if ($response.StatusCode -eq 200) {
-        Write-Host "✓ MLflow is responding" -ForegroundColor Green
-    }
-} catch {
-    Write-Host "⚠ MLflow is not responding (may still be starting)" -ForegroundColor Yellow
 }
 
 # MinIO health check
@@ -143,7 +133,6 @@ if ($allHealthy) {
     Write-Host "  Frontend:  http://localhost:3000"
     Write-Host "  Backend:   http://localhost:8000"
     Write-Host "  API Docs:  http://localhost:8000/docs"
-    Write-Host "  MLflow:    http://localhost:5000"
     Write-Host "  MinIO:     http://localhost:9001"
     Write-Host ""
     Write-Host "Next steps:"

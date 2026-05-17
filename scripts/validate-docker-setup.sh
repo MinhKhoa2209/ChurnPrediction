@@ -64,7 +64,7 @@ if ! docker-compose ps | grep -q "Up"; then
 fi
 
 # Check individual service health
-services=("postgres" "redis" "minio" "mlflow" "backend")
+services=("postgres" "redis" "minio" "backend")
 all_healthy=true
 
 for service in "${services[@]}"; do
@@ -86,13 +86,6 @@ if curl -f http://localhost:8000/health > /dev/null 2>&1; then
 else
     echo -e "${RED}❌ Backend API is not responding${NC}"
     all_healthy=false
-fi
-
-# MLflow health check
-if curl -f http://localhost:5000/health > /dev/null 2>&1; then
-    echo -e "${GREEN}✓ MLflow is responding${NC}"
-else
-    echo -e "${YELLOW}⚠ MLflow is not responding (may still be starting)${NC}"
 fi
 
 # MinIO health check
@@ -133,7 +126,6 @@ if [ "$all_healthy" = true ]; then
     echo "  Frontend:  http://localhost:3000"
     echo "  Backend:   http://localhost:8000"
     echo "  API Docs:  http://localhost:8000/docs"
-    echo "  MLflow:    http://localhost:5000"
     echo "  MinIO:     http://localhost:9001"
     echo ""
     echo "Next steps:"

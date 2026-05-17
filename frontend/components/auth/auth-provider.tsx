@@ -6,13 +6,22 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/store/auth-store';
 import { getCurrentUser } from '@/lib/auth';
 
-const PUBLIC_ROUTES = ['/login', '/register', '/forgot-password', '/reset-password', '/admin/login'];
+const AUTH_ROUTES = ['/login', '/register', '/admin/login'];
+const PUBLIC_ROUTES = [
+  ...AUTH_ROUTES,
+  '/forgot-password',
+  '/reset-password',
+  '/auth/callback',
+];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { token, setAuth, clearAuth, setLoading } = useAuthStore();
+  const { token, user, setAuth, clearAuth, setLoading } = useAuthStore();
   const [hydrated, setHydrated] = useState(false);
+
+  const isPublicRoute = PUBLIC_ROUTES.some(route => pathname.startsWith(route));
+  const isAuthRoute = AUTH_ROUTES.some(route => pathname.startsWith(route));
 
   useEffect(() => {
     setHydrated(true);
@@ -24,31 +33,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     const validateAuth = async () => {
-      if (PUBLIC_ROUTES.some(route => pathname.startsWith(route))) {
-        setLoading(false);
-        return;
-      }
-
       if (!token) {
         setLoading(false);
-        router.push('/login');
+        if (!isPublicRoute) {
+          router.push('/login');
+        }
         return;
       }
 
       try {
-        const user = await getCurrentUser(token);
-        setAuth(user, token);
+        const currentUser = await getCurrentUser(token);
+        setAuth(currentUser, token);
+        if (isAuthRoute) {
+          router.replace('/dashboard');
+        }
       } catch (error) {
         console.error('Token validation failed:', error);
         clearAuth();
-        router.push('/login');
+        if (!isPublicRoute) {
+          router.push('/login');
+        }
       }
     };
 
     validateAuth();
-  }, [hydrated, pathname, token, router, setAuth, clearAuth, setLoading]);
+  }, [hydrated, isAuthRoute, isPublicRoute, pathname, token, router, setAuth, clearAuth, setLoading]);
 
-  if (!hydrated) {
+  if (!hydrated || (isAuthRoute && (token || user))) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-foreground" role="status" aria-live="polite">

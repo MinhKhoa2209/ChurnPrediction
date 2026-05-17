@@ -451,7 +451,7 @@ export default function ModelComparisonPage() {
                     F1-Score Comparison
                   </h2>
                   <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
                       <BarChart data={comparisonChartData}>
                         <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" />
                         <XAxis
@@ -481,7 +481,7 @@ export default function ModelComparisonPage() {
                     Training Time Comparison
                   </h2>
                   <div className="h-80">
-                    <ResponsiveContainer width="100%" height="100%">
+                    <ResponsiveContainer width="100%" height="100%" minWidth={300} minHeight={300}>
                       <BarChart data={comparisonChartData}>
                         <CartesianGrid stroke={CHART_GRID_COLOR} strokeDasharray="3 3" />
                         <XAxis

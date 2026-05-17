@@ -34,8 +34,6 @@ class ModelVersion(Base):
     
                           
     artifact_path = Column(String(500), nullable=False)                      
-    mlflow_run_id = Column(String(255), nullable=True)
-    
                           
     status = Column(
         Enum("active", "archived", name="model_status"),

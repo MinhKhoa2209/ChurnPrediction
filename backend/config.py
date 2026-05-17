@@ -27,10 +27,6 @@ class Settings(BaseSettings):
     # OAuth Configuration
     google_client_id: Optional[str] = None
     google_client_secret: Optional[str] = None
-    github_client_id: Optional[str] = None
-    github_client_secret: Optional[str] = None
-    microsoft_client_id: Optional[str] = None
-    microsoft_client_secret: Optional[str] = None
     oauth_redirect_url: str = "http://localhost:3000/auth/callback/{provider}"
 
     encryption_key: str
@@ -44,9 +40,6 @@ class Settings(BaseSettings):
     s3_region: str = "us-east-1"
 
     debug: bool = False
-
-    mlflow_tracking_uri: str
-    mlflow_experiment_name: str = "churn-prediction"
 
     cors_origins: str = "http://localhost:3000"
 
@@ -128,9 +121,6 @@ def validate_configuration() -> None:
     if not settings.s3_access_key_id or not settings.s3_secret_access_key:
         errors.append("S3_ACCESS_KEY_ID and S3_SECRET_ACCESS_KEY are required")
 
-    if not settings.mlflow_tracking_uri:
-        errors.append("MLFLOW_TRACKING_URI is required for experiment tracking")
-
     valid_environments = ["development", "staging", "production", "test"]
     if settings.environment not in valid_environments:
         errors.append(f"ENVIRONMENT must be one of: {', '.join(valid_environments)}")
@@ -186,10 +176,6 @@ def get_config_summary() -> dict:
                 "reports": settings.s3_bucket_reports,
                 "exports": settings.s3_bucket_exports,
             },
-        },
-        "mlflow": {
-            "configured": bool(settings.mlflow_tracking_uri),
-            "experiment": settings.mlflow_experiment_name,
         },
         "api": {
             "prefix": settings.api_v1_prefix,

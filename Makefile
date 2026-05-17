@@ -63,7 +63,6 @@ up:
 	@echo "  Frontend:  http://localhost:3000"
 	@echo "  Backend:   http://localhost:8000"
 	@echo "  API Docs:  http://localhost:8000/docs"
-	@echo "  MLflow:    http://localhost:5000"
 	@echo "  MinIO:     http://localhost:9001"
 
 down:

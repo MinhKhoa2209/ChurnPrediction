@@ -1,5 +1,5 @@
-import { redirect } from 'next/navigation';
+import ModelComparisonPage from './comparison/page';
 
 export default function ModelsPage() {
-  redirect('/models/comparison');
+  return <ModelComparisonPage />;
 }

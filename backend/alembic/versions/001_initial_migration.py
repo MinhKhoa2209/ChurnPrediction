@@ -117,7 +117,6 @@ def upgrade() -> None:
         sa.Column('confusion_matrix', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column('training_time_seconds', sa.Float(), nullable=False),
         sa.Column('artifact_path', sa.String(length=500), nullable=False),
-        sa.Column('mlflow_run_id', sa.String(length=255), nullable=True),
         sa.Column('status', postgresql.ENUM('active', 'archived', name='model_status'), server_default=sa.text("'active'"), nullable=False),
         sa.Column('classification_threshold', sa.Float(), server_default=sa.text('0.5'), nullable=False),
         sa.Column('trained_at', sa.DateTime(timezone=True), server_default=sa.text('CURRENT_TIMESTAMP'), nullable=False),
